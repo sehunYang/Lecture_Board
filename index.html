@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>강의 보드</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.3/css/dotum.css" />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1a365d;
+      --muted: #8a8a8a;
+      --line: #e6e6e6;
+      --bubble: #e8f1fe;          /* 옅은 푸른색 채움 */
+      --bubble-border: #9cc3f5;   /* 푸른색 테두리 */
+      --bubble-hidden: #eef2f7;
+      --bubble-hidden-border: #cdd8e6;
+      --accent: #2563eb;
+      --accent-fg: #ffffff;
+      --danger: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "KoPubWorld Dotum", -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    .wrap {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 16px 16px 80px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0 16px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 20px;
+    }
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 0;
+      color: var(--fg);
+      letter-spacing: -0.01em;
+    }
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      padding: 8px 14px;
+      background: #f0f0f0;
+      color: var(--fg);
+      transition: background 0.12s ease, opacity 0.12s ease;
+    }
+    button:hover { background: #e6e6e6; }
+    button:active { opacity: 0.8; }
+    .btn-mode { background: transparent; color: var(--accent); font-weight: 600; }
+    .btn-mode:hover { background: #eef2ff; }
+    .btn-primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-danger { color: var(--danger); }
+
+    /* Banner */
+    .banner {
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      color: #7a5b00;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .banner code { background: #fff2c2; padding: 1px 5px; border-radius: 4px; }
+    .hidden { display: none !important; }
+
+    /* Composer (teacher) */
+    .composer { margin-bottom: 22px; }
+    .composer textarea {
+      width: 100%;
+      min-height: 110px;
+      resize: vertical;
+      font-family: inherit;
+      font-size: 1.15rem;
+      line-height: 1.5;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      color: var(--fg);
+    }
+    .composer textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .composer-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+    .bulk-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+
+    /* Bubbles */
+    .list { display: flex; flex-direction: column; gap: 14px; }
+    .bubble {
+      background: var(--bubble);
+      border: 1.5px solid var(--bubble-border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .bubble.is-hidden {
+      background: var(--bubble-hidden);
+      border-color: var(--bubble-hidden-border);
+      opacity: 0.55;
+    }
+    .bubble .text {
+      flex: 1;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 1.5rem;
+      line-height: 1.5;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .bubble .num {
+      flex-shrink: 0;
+      min-width: 1.5em;
+      text-align: right;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      opacity: 0.65;
+      padding-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+    .bubble .time {
+      flex-shrink: 0;
+      align-self: flex-start;
+      padding-top: 6px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .bubble .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .bubble .actions button { padding: 7px 12px; font-size: 0.9rem; white-space: nowrap; }
+    .bubble .reorder {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .bubble .reorder button {
+      padding: 6px 12px;
+      font-size: 1rem;
+      line-height: 1;
+      font-weight: 700;
+    }
+    .bubble .reorder button:disabled { opacity: 0.3; cursor: default; }
+    .bubble.editing { flex-direction: column; }
+    .bubble .edit-area {
+      width: 100%;
+      min-height: 90px;
+      font-family: inherit;
+      font-size: 1.4rem;
+      line-height: 1.5;
+      padding: 12px;
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      resize: vertical;
+    }
+    .bubble .edit-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; width: 100%; }
+
+    .empty { color: var(--muted); text-align: center; padding: 48px 0; font-size: 1.05rem; }
+
+    /* Profile editor (teacher only) */
+    .profile-editor {
+      margin-top: 36px;
+      padding: 12px 18px;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+    }
+    .pf-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 700;
+      padding: 6px 0;
+    }
+    .pf-toggle:hover { background: transparent; opacity: 0.8; }
+    .pf-toggle .pf-icon { font-size: 0.8rem; }
+    .pf-body { margin-top: 12px; }
+    .profile-editor label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .profile-editor input,
+    .profile-editor textarea {
+      width: 100%;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      color: var(--fg);
+      background: #fff;
+    }
+    .profile-editor textarea {
+      min-height: 70px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+    .profile-editor input:focus,
+    .profile-editor textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .profile-editor .pe-row { display: flex; justify-content: flex-end; }
+
+    /* Profile card (footer, everyone) */
+    .profile-footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.65;
+    }
+    .profile-footer .pf-name { font-weight: 600; }
+    .profile-footer .pf-contact-label { margin-top: 4px; font-weight: 600; }
+    .profile-footer .pf-contact {
+      white-space: pre-line;
+      padding-left: 8px;
+      border-left: 2px solid var(--line);
+      margin-top: 2px;
+    }
+    .profile-footer .pf-copy { margin-top: 6px; font-size: 0.72rem; opacity: 0.9; }
+
+    @media (max-width: 560px) {
+      .bubble { flex-direction: row; flex-wrap: wrap; }
+      .bubble .text { flex-basis: 100%; order: 2; font-size: 1.3rem; }
+      .bubble .num { order: 1; }
+      .bubble .time { order: 3; padding-top: 0; }
+      .bubble .actions { order: 4; flex-direction: row; flex-wrap: wrap; }
+      .bubble .reorder { order: 5; flex-direction: row; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1 id="title">강의 보드</h1>
+      <button id="modeToggle" class="btn-mode">강의자 모드</button>
+    </header>
+
+    <div id="setupBanner" class="banner hidden">
+      ⚠️ Firebase 설정이 아직 안 됐습니다. <code>index.html</code> 상단 <code>firebaseConfig</code> 값을
+      본인 프로젝트 값으로 교체하세요. 방법은 <code>README.md</code> 참고.
+    </div>
+
+    <!-- 강의자 전용 작성 영역 -->
+    <div id="teacherComposer" class="composer hidden">
+      <textarea id="input" placeholder="여기에 글을 적고 저장하세요 (여러 줄 가능)"></textarea>
+      <div class="composer-row">
+        <button id="saveBtn" class="btn-primary">저장</button>
+      </div>
+      <div class="bulk-row">
+        <button id="hideAllBtn">모두 숨기기</button>
+        <button id="showAllBtn">모두 보이기</button>
+      </div>
+    </div>
+
+    <div id="list" class="list"></div>
+    <div id="empty" class="empty hidden">아직 표시된 글이 없습니다.</div>
+
+    <!-- 강의자 전용 프로필 편집 (강의자 모드 맨 아래) -->
+    <div id="profileEditor" class="profile-editor hidden">
+      <button id="pfToggle" class="pf-toggle" type="button" aria-expanded="false" aria-controls="pfBody">
+        <span>프로필 카드 편집</span>
+        <span id="pfIcon" class="pf-icon">▸</span>
+      </button>
+      <div id="pfBody" class="pf-body hidden">
+        <label for="pfName">이름</label>
+        <input id="pfName" type="text" placeholder="이름" autocomplete="off" />
+        <label for="pfAffiliation">소속</label>
+        <input id="pfAffiliation" type="text" placeholder="소속" autocomplete="off" />
+        <label for="pfContact">Contact (여러 줄 입력 가능 — SNS, 이메일 등)</label>
+        <textarea id="pfContact" placeholder="예)&#10;Email: name@example.com&#10;Instagram: @handle"></textarea>
+        <div class="pe-row">
+          <button id="pfSaveBtn" class="btn-primary">프로필 저장</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 프로필 카드 (양쪽 화면 공통 푸터) -->
+    <footer id="profileCard" class="profile-footer hidden"></footer>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getDatabase, ref, push, onValue, update, remove, get, child
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // ====== Firebase 설정 (본인 값으로 교체하세요 — README.md 참고) ======
+    const firebaseConfig = {
+      apiKey: "AIzaSyAKrNGCO-9vvtO6vM-NK_atwKl4OAmmtCw",
+      authDomain: "lecture-dashboard-e3e86.firebaseapp.com",
+      databaseURL: "https://lecture-dashboard-e3e86-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "lecture-dashboard-e3e86",
+      storageBucket: "lecture-dashboard-e3e86.firebasestorage.app",
+      messagingSenderId: "329153867015",
+      appId: "1:329153867015:web:ea43fd013388b464f569a2"
+    };
+    // ====================================================================
+
+    const TEACHER_PASSWORD = "4496";
+    const DB_PATH = "rooms/default/messages";
+    const PROFILE_PATH = "rooms/default/profile";
+
+    const configured = firebaseConfig.apiKey !== "YOUR_API_KEY";
+    let db = null, messagesRef = null, profileRef = null;
+    if (configured) {
+      const app = initializeApp(firebaseConfig);
+      db = getDatabase(app);
+      messagesRef = ref(db, DB_PATH);
+      profileRef = ref(db, PROFILE_PATH);
+    } else {
+      document.getElementById("setupBanner").classList.remove("hidden");
+    }
+
+    // ---- State ----
+    let messages = [];            // [{id, text, createdAt, hidden}]
+    let mode = "student";         // 'student' | 'teacher'
+    let editingId = null;
+    let profile = { name: "", affiliation: "", contact: "" };
+
+    // ---- Elements ----
+    const listEl = document.getElementById("list");
+    const emptyEl = document.getElementById("empty");
+    const composerEl = document.getElementById("teacherComposer");
+    const modeToggle = document.getElementById("modeToggle");
+    const titleEl = document.getElementById("title");
+    const inputEl = document.getElementById("input");
+    const profileEditorEl = document.getElementById("profileEditor");
+    const profileCardEl = document.getElementById("profileCard");
+    const pfNameEl = document.getElementById("pfName");
+    const pfAffiliationEl = document.getElementById("pfAffiliation");
+    const pfContactEl = document.getElementById("pfContact");
+    const pfToggleEl = document.getElementById("pfToggle");
+    const pfBodyEl = document.getElementById("pfBody");
+    const pfIconEl = document.getElementById("pfIcon");
+
+    // ---- Mode ----
+    function enterTeacher() {
+      const pw = window.prompt("강의자 비밀번호를 입력하세요");
+      if (pw === null) return;
+      if (pw !== TEACHER_PASSWORD) { alert("비밀번호가 올바르지 않습니다."); return; }
+      mode = "teacher";
+      location.hash = "teacher";
+      applyMode();
+    }
+    function exitTeacher() {
+      mode = "student";
+      editingId = null;
+      if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+      applyMode();
+    }
+    function applyMode() {
+      const teacher = mode === "teacher";
+      composerEl.classList.toggle("hidden", !teacher);
+      profileEditorEl.classList.toggle("hidden", !teacher);
+      modeToggle.textContent = teacher ? "수강생 화면으로" : "강의자 모드";
+      titleEl.textContent = teacher ? "강의 보드 · 강의자" : "강의 보드";
+      if (teacher) fillProfileInputs();
+      render();
+    }
+    modeToggle.addEventListener("click", () => (mode === "teacher" ? exitTeacher() : enterTeacher()));
+
+    // ---- Data ops ----
+    function saveMessage() {
+      if (!configured) return alert("Firebase 설정이 필요합니다. README.md를 확인하세요.");
+      const text = inputEl.value.trim();
+      if (!text) return;
+      const now = Date.now();
+      push(messagesRef, { text, createdAt: now, updatedAt: now, hidden: false, order: now });
+      inputEl.value = "";
+      inputEl.focus();
+    }
+    function updateText(id, text) {
+      update(ref(db, `${DB_PATH}/${id}`), { text, updatedAt: Date.now() });
+    }
+    function setHidden(id, hidden) {
+      update(ref(db, `${DB_PATH}/${id}`), { hidden });
+    }
+    function deleteMessage(id) {
+      if (!confirm("이 글을 삭제할까요?")) return;
+      remove(ref(db, `${DB_PATH}/${id}`));
+    }
+    function setAllHidden(hidden) {
+      if (!messages.length) return;
+      const updates = {};
+      messages.forEach(m => { updates[`${m.id}/hidden`] = hidden; });
+      update(messagesRef, updates);
+    }
+    // 정렬 기준값(order 없으면 createdAt로 대체)
+    function effOrder(m) {
+      return (m.order !== undefined && m.order !== null) ? m.order : m.createdAt;
+    }
+    // dir: -1 = 위로, +1 = 아래로 (강의자 전체 목록 기준으로 이웃과 order 교환)
+    function moveMessage(id, dir) {
+      const sorted = sortMessages(messages);
+      const i = sorted.findIndex(m => m.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= sorted.length) return;
+      const a = sorted[i], b = sorted[j];
+      update(messagesRef, {
+        [`${a.id}/order`]: effOrder(b),
+        [`${b.id}/order`]: effOrder(a)
+      });
+    }
+    // 최신/상단 우선(order 내림차순), 동률이면 createdAt·id로 안정 정렬
+    function sortMessages(arr) {
+      return [...arr].sort((a, b) =>
+        (effOrder(b) - effOrder(a)) ||
+        (b.createdAt - a.createdAt) ||
+        (a.id < b.id ? 1 : -1)
+      );
+    }
+
+    document.getElementById("saveBtn").addEventListener("click", saveMessage);
+    document.getElementById("hideAllBtn").addEventListener("click", () => setAllHidden(true));
+    document.getElementById("showAllBtn").addEventListener("click", () => setAllHidden(false));
+    inputEl.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") saveMessage();
+    });
+
+    // ---- Profile ----
+    function fillProfileInputs() {
+      // 편집 중(포커스)인 칸은 덮어쓰지 않음
+      if (document.activeElement !== pfNameEl) pfNameEl.value = profile.name || "";
+      if (document.activeElement !== pfAffiliationEl) pfAffiliationEl.value = profile.affiliation || "";
+      if (document.activeElement !== pfContactEl) pfContactEl.value = profile.contact || "";
+    }
+    function saveProfile() {
+      if (!configured) return alert("Firebase 설정이 필요합니다. README.md를 확인하세요.");
+      update(profileRef, {
+        name: pfNameEl.value.trim(),
+        affiliation: pfAffiliationEl.value.trim(),
+        contact: pfContactEl.value.trim()
+      });
+      const btn = document.getElementById("pfSaveBtn");
+      const original = btn.textContent;
+      btn.textContent = "저장됨";
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1000);
+    }
+    function renderProfile() {
+      const has = !!(profile.name || profile.affiliation || profile.contact);
+      profileCardEl.classList.toggle("hidden", !has);
+      profileCardEl.innerHTML = "";
+      if (!has) return;
+      if (profile.name) {
+        const d = document.createElement("div");
+        d.className = "pf-name";
+        d.textContent = profile.name;
+        profileCardEl.appendChild(d);
+      }
+      if (profile.affiliation) {
+        const d = document.createElement("div");
+        d.textContent = profile.affiliation;
+        profileCardEl.appendChild(d);
+      }
+      if (profile.contact) {
+        const label = document.createElement("div");
+        label.className = "pf-contact-label";
+        label.textContent = "Contact";
+        const d = document.createElement("div");
+        d.className = "pf-contact";
+        d.textContent = profile.contact;
+        profileCardEl.appendChild(label);
+        profileCardEl.appendChild(d);
+      }
+      const year = new Date().getFullYear();
+      const who = profile.name ? " " + profile.name : "";
+      const c = document.createElement("div");
+      c.className = "pf-copy";
+      c.textContent = `© ${year}${who} · 비영리 목적의 복사·배포 허용, 상업적 이용 금지 (CC BY-NC)`;
+      profileCardEl.appendChild(c);
+    }
+
+    document.getElementById("pfSaveBtn").addEventListener("click", saveProfile);
+    pfToggleEl.addEventListener("click", () => {
+      const collapsed = pfBodyEl.classList.toggle("hidden");
+      pfIconEl.textContent = collapsed ? "▸" : "▾";
+      pfToggleEl.setAttribute("aria-expanded", String(!collapsed));
+    });
+
+    // ---- Clipboard ----
+    async function copyText(text, btn) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); } catch {}
+        document.body.removeChild(ta);
+      }
+      const original = btn.textContent;
+      btn.textContent = "복사됨";
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1000);
+    }
+
+    // ---- Time formatting ----
+    const pad2 = (n) => String(n).padStart(2, "0");
+    // 강의자용 절대시간: MM-DD HH:MM
+    function formatAbsolute(ts) {
+      const d = new Date(ts);
+      return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    }
+    // 수강생용 상대시간: 최대 단위만 표기 (초/분/시간/일/월/년 전)
+    function formatRelative(ts) {
+      const sec = Math.floor(Math.max(0, Date.now() - ts) / 1000);
+      if (sec < 60) return pad2(sec) + "초 전";
+      const min = Math.floor(sec / 60);
+      if (min < 60) return pad2(min) + "분 전";
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return pad2(hr) + "시간 전";
+      const day = Math.floor(hr / 24);
+      if (day < 30) return pad2(day) + "일 전";
+      const month = Math.floor(day / 30);
+      if (month < 12) return pad2(month) + "월 전";
+      return pad2(Math.floor(month / 12)) + "년 전";
+    }
+    // 수강생 화면 상대시간 라벨을 주기적으로 갱신(재렌더 없이)
+    function updateRelativeTimes() {
+      document.querySelectorAll('#list .time[data-rel]').forEach(el => {
+        el.textContent = formatRelative(Number(el.dataset.ts));
+      });
+    }
+    setInterval(updateRelativeTimes, 1000);
+
+    // ---- Render ----
+    function render() {
+      const teacher = mode === "teacher";
+      // 수강생: 숨김 제외. 강의자: 전부. 둘 다 최신 위.
+      // 수강생: 숨김 제외. 강의자: 전부. order 기준 상단 우선.
+      const visible = sortMessages(messages.filter(m => teacher || !m.hidden));
+
+      listEl.innerHTML = "";
+      emptyEl.classList.toggle("hidden", visible.length > 0);
+
+      visible.forEach((m, idx) => {
+        const bubble = document.createElement("div");
+        bubble.className = "bubble" + (m.hidden ? " is-hidden" : "");
+
+        // 왼쪽 순서 번호 (표시되는 목록 기준 — 수강생은 숨김 제외 후 재부여)
+        const numEl = document.createElement("div");
+        numEl.className = "num";
+        numEl.textContent = String(idx + 1);
+
+        if (teacher && editingId === m.id) {
+          bubble.classList.add("editing");
+          const ta = document.createElement("textarea");
+          ta.className = "edit-area";
+          ta.value = m.text;
+          const row = document.createElement("div");
+          row.className = "edit-row";
+          const save = document.createElement("button");
+          save.className = "btn-primary";
+          save.textContent = "저장";
+          save.addEventListener("click", () => {
+            const v = ta.value.trim();
+            if (v) updateText(m.id, v);
+            editingId = null; render();
+          });
+          const cancel = document.createElement("button");
+          cancel.textContent = "취소";
+          cancel.addEventListener("click", () => { editingId = null; render(); });
+          row.append(save, cancel);
+          bubble.append(ta, row);
+          listEl.appendChild(bubble);
+          ta.focus();
+          return;
+        }
+
+        const textEl = document.createElement("div");
+        textEl.className = "text";
+        textEl.textContent = m.text;
+
+        // 버튼 왼쪽 작은 시간 표기 (강의자=절대시간, 수강생=상대시간)
+        const timeEl = document.createElement("div");
+        timeEl.className = "time";
+        if (teacher) {
+          timeEl.textContent = formatAbsolute(m.updatedAt);
+        } else {
+          timeEl.textContent = formatRelative(m.updatedAt);
+          timeEl.dataset.ts = String(m.updatedAt);
+          timeEl.dataset.rel = "1";
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        if (teacher) {
+          const editBtn = document.createElement("button");
+          editBtn.textContent = "수정";
+          editBtn.addEventListener("click", () => { editingId = m.id; render(); });
+
+          const hideBtn = document.createElement("button");
+          hideBtn.textContent = m.hidden ? "보이기" : "숨기기";
+          hideBtn.addEventListener("click", () => setHidden(m.id, !m.hidden));
+
+          const delBtn = document.createElement("button");
+          delBtn.className = "btn-danger";
+          delBtn.textContent = "삭제";
+          delBtn.addEventListener("click", () => deleteMessage(m.id));
+
+          actions.append(editBtn, hideBtn, delBtn);
+
+          // 오른쪽 위/아래 순서 변경 버튼
+          const reorder = document.createElement("div");
+          reorder.className = "reorder";
+          const upBtn = document.createElement("button");
+          upBtn.textContent = "▲";
+          upBtn.title = "위로";
+          upBtn.disabled = idx === 0;
+          upBtn.addEventListener("click", () => moveMessage(m.id, -1));
+          const downBtn = document.createElement("button");
+          downBtn.textContent = "▼";
+          downBtn.title = "아래로";
+          downBtn.disabled = idx === visible.length - 1;
+          downBtn.addEventListener("click", () => moveMessage(m.id, 1));
+          reorder.append(upBtn, downBtn);
+
+          bubble.append(numEl, textEl, timeEl, actions, reorder);
+        } else {
+          const copyBtn = document.createElement("button");
+          copyBtn.textContent = "복사";
+          copyBtn.addEventListener("click", () => copyText(m.text, copyBtn));
+          actions.append(copyBtn);
+
+          bubble.append(numEl, textEl, timeEl, actions);
+        }
+
+        listEl.appendChild(bubble);
+      });
+    }
+
+    // ---- Live sync ----
+    if (configured) {
+      onValue(messagesRef, (snap) => {
+        const val = snap.val() || {};
+        messages = Object.entries(val).map(([id, v]) => ({
+          id,
+          text: v.text || "",
+          createdAt: v.createdAt || 0,
+          hidden: !!v.hidden,
+          order: (v.order !== undefined && v.order !== null) ? v.order : (v.createdAt || 0),
+          updatedAt: (v.updatedAt !== undefined && v.updatedAt !== null) ? v.updatedAt : (v.createdAt || 0)
+        }));
+        render();
+      });
+      onValue(profileRef, (snap) => {
+        const v = snap.val() || {};
+        profile = { name: v.name || "", affiliation: v.affiliation || "", contact: v.contact || "" };
+        renderProfile();
+        if (mode === "teacher") fillProfileInputs();
+      });
+    }
+
+    // ---- Init: honor #teacher (still requires password) ----
+    if (location.hash.replace("#", "") === "teacher") {
+      enterTeacher();
+    }
+    applyMode();
+  </script>
+</body>
+</html>
