@@ -1,1054 +1,860 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>에너지 보존 법칙 탐구 홈페이지</title>
-    <!-- Tailwind CSS for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Phosphor Icons for Notion-like UI icons -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <!-- SheetJS for Excel generation and parsing -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <!-- Chart.js for data visualization -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Custom styling to mimic Notion's typography and clean look -->
-    <style>
-        /* Notion-like typography and reset */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
-            color: #37352f;
-            background-color: #ffffff;
-            margin: 0;
-            overflow: hidden; /* Prevent body scroll, handle scroll in main content */
-            display: flex;
-            height: 100vh;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>강의 보드</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.3/css/dotum.css" />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1a365d;
+      --muted: #8a8a8a;
+      --line: #e6e6e6;
+      --bubble: #e8f1fe;          /* 옅은 푸른색 채움 */
+      --bubble-border: #9cc3f5;   /* 푸른색 테두리 */
+      --bubble-hidden: #eef2f7;
+      --bubble-hidden-border: #cdd8e6;
+      --accent: #2563eb;
+      --accent-fg: #ffffff;
+      --danger: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "KoPubWorld Dotum", -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    .wrap {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 16px 16px 80px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0 16px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 20px;
+    }
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 0;
+      color: var(--fg);
+      letter-spacing: -0.01em;
+    }
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      padding: 8px 14px;
+      background: #f0f0f0;
+      color: var(--fg);
+      transition: background 0.12s ease, opacity 0.12s ease;
+    }
+    button:hover { background: #e6e6e6; }
+    button:active { opacity: 0.8; }
+    .btn-mode { background: transparent; color: var(--accent); font-weight: 600; }
+    .btn-mode:hover { background: #eef2ff; }
+    .btn-primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-danger { color: var(--danger); }
 
-        /* Sidebar Styling */
-        #sidebar {
-            width: 250px;
-            background-color: #fbfbfa;
-            border-right: 1px solid rgba(55, 53, 47, 0.09);
-            padding-top: 12px;
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.3s ease;
-            z-index: 50;
-        }
+    /* Banner */
+    .banner {
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      color: #7a5b00;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .banner code { background: #fff2c2; padding: 1px 5px; border-radius: 4px; }
+    .hidden { display: none !important; }
 
-        /* Sidebar items hover effect */
-        .sidebar-item {
-            display: flex;
-            align-items: center;
-            padding: 6px 14px;
-            margin: 2px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.1s ease;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        
-        .sidebar-item:hover {
-            background-color: rgba(55, 53, 47, 0.08);
-        }
+    /* Composer (teacher) */
+    .composer { margin-bottom: 22px; }
+    .composer textarea {
+      width: 100%;
+      min-height: 110px;
+      resize: vertical;
+      font-family: inherit;
+      font-size: 1.15rem;
+      line-height: 1.5;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      color: var(--fg);
+    }
+    .composer textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .composer-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+    .bulk-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 
-        .sidebar-item.active {
-            background-color: rgba(55, 53, 47, 0.08);
-            font-weight: 600;
-        }
+    /* Bubbles */
+    .list { display: flex; flex-direction: column; gap: 14px; }
+    .bubble {
+      background: var(--bubble);
+      border: 1.5px solid var(--bubble-border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .bubble.is-hidden {
+      background: var(--bubble-hidden);
+      border-color: var(--bubble-hidden-border);
+      opacity: 0.55;
+    }
+    /* 수강생 화면: 버블 전체가 복사 버튼 역할 */
+    .bubble.copyable { cursor: pointer; }
+    .bubble.copyable:hover { border-color: var(--accent); }
+    .bubble.copyable:active { opacity: 0.85; }
+    .bubble .content { flex: 1; min-width: 0; }
+    .bubble .text {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 1.5rem;
+      line-height: 1.5;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    /* 3줄 초과 시 ... 처리 */
+    .bubble .text.clamped {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .bubble .btn-more {
+      margin-top: 8px;
+      padding: 4px 10px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: transparent;
+      border: 1px solid var(--bubble-border);
+      border-radius: 999px;
+    }
+    .bubble .btn-more:hover { background: #dbe9fd; }
+    .bubble .num {
+      flex-shrink: 0;
+      min-width: 1.5em;
+      text-align: right;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      opacity: 0.65;
+      padding-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+    .bubble .time {
+      flex-shrink: 0;
+      align-self: flex-start;
+      padding-top: 6px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .bubble .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .bubble .actions button { padding: 7px 12px; font-size: 0.9rem; white-space: nowrap; }
+    .bubble .reorder {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .bubble .reorder button {
+      padding: 6px 12px;
+      font-size: 1rem;
+      line-height: 1;
+      font-weight: 700;
+    }
+    .bubble .reorder button:disabled { opacity: 0.3; cursor: default; }
+    .bubble.editing { flex-direction: column; }
+    .bubble .edit-area {
+      width: 100%;
+      min-height: 90px;
+      font-family: inherit;
+      font-size: 1.4rem;
+      line-height: 1.5;
+      padding: 12px;
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      resize: vertical;
+    }
+    .bubble .edit-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; width: 100%; }
 
-        /* Main Content Area */
-        #main-content {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 0 48px 10vh 48px;
-            scroll-behavior: smooth;
-        }
+    .empty { color: var(--muted); text-align: center; padding: 48px 0; font-size: 1.05rem; }
 
-        .content-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding-top: 8vh;
-        }
+    /* Profile editor (teacher only) */
+    .profile-editor {
+      margin-top: 36px;
+      padding: 12px 18px;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+    }
+    .pf-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 700;
+      padding: 6px 0;
+    }
+    .pf-toggle:hover { background: transparent; opacity: 0.8; }
+    .pf-toggle .pf-icon { font-size: 0.8rem; }
+    .pf-body { margin-top: 12px; }
+    .profile-editor label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .profile-editor input,
+    .profile-editor textarea {
+      width: 100%;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      color: var(--fg);
+      background: #fff;
+    }
+    .profile-editor textarea {
+      min-height: 70px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+    .profile-editor input:focus,
+    .profile-editor textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .profile-editor .pe-row { display: flex; justify-content: flex-end; }
 
-        /* Page Headers */
-        h1.page-title {
-            font-size: 40px;
-            font-weight: 700;
-            margin-bottom: 24px;
-            line-height: 1.2;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        h2.section-title {
-            font-size: 24px;
-            font-weight: 600;
-            margin-top: 32px;
-            margin-bottom: 12px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid rgba(55, 53, 47, 0.09);
-        }
+    /* Profile card (footer, everyone) */
+    .profile-footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.65;
+    }
+    .profile-footer .pf-name { font-weight: 600; }
+    .profile-footer .pf-contact-label { margin-top: 4px; font-weight: 600; }
+    .profile-footer .pf-contact {
+      white-space: pre-line;
+      padding-left: 8px;
+      border-left: 2px solid var(--line);
+      margin-top: 2px;
+    }
+    .profile-footer .pf-copy { margin-top: 6px; font-size: 0.72rem; opacity: 0.9; }
 
-        /* Notion-like Callout blocks */
-        .callout {
-            padding: 16px;
-            border-radius: 4px;
-            background-color: #f1f1ef;
-            display: flex;
-            gap: 12px;
-            margin-bottom: 16px;
-            font-size: 15px;
-        }
+    /* Copy modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 100;
+    }
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      padding: 26px 30px 20px;
+      min-width: 240px;
+      max-width: 320px;
+      text-align: center;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
+      animation: modal-in 0.16s ease-out;
+    }
+    @keyframes modal-in {
+      from { transform: scale(0.94); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .modal .modal-icon {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 1.4rem;
+      line-height: 44px;
+      font-weight: 700;
+    }
+    .modal .modal-msg { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+    .modal .modal-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .modal .modal-ok { min-width: 90px; }
 
-        /* Button styles */
-        .btn-download {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background-color: white;
-            border: 1px solid rgba(55, 53, 47, 0.16);
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: background 0.2s;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            text-decoration: none;
-            color: inherit;
-        }
-        
-        .btn-download:hover {
-            background-color: #f1f1ef;
-        }
-
-        /* Tab System */
-        .tab-header {
-            display: flex;
-            border-bottom: 1px solid rgba(55, 53, 47, 0.09);
-            margin-bottom: 20px;
-        }
-        .tab-btn {
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 15px;
-            font-weight: 500;
-            color: rgba(55, 53, 47, 0.6);
-            border-bottom: 2px solid transparent;
-            transition: color 0.2s, border-color 0.2s;
-        }
-        .tab-btn:hover {
-            color: #37352f;
-        }
-        .tab-btn.active {
-            color: #37352f;
-            border-bottom-color: #37352f;
-        }
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.3s;
-        }
-        .tab-content.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Mobile adjustments */
-        @media (max-width: 768px) {
-            #sidebar {
-                position: absolute;
-                height: 100%;
-                transform: translateX(-100%);
-                box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-            }
-            #sidebar.open {
-                transform: translateX(0);
-            }
-            #main-content {
-                padding: 0 24px;
-            }
-            .mobile-menu-btn {
-                display: block !important;
-            }
-        }
-        
-        /* Utility for hiding pages */
-        .page-section {
-            display: none;
-        }
-        .page-section.active {
-            display: block;
-        }
-    </style>
+    @media (max-width: 560px) {
+      .bubble { flex-direction: row; flex-wrap: wrap; }
+      .bubble .content { flex-basis: 100%; order: 2; }
+      .bubble .text { font-size: 1.3rem; }
+      .bubble .num { order: 1; }
+      .bubble .time { order: 3; padding-top: 0; }
+      .bubble .actions { order: 4; flex-direction: row; flex-wrap: wrap; }
+      .bubble .reorder { order: 5; flex-direction: row; }
+    }
+  </style>
 </head>
 <body>
+  <div class="wrap">
+    <header>
+      <h1 id="title">강의 보드</h1>
+      <button id="modeToggle" class="btn-mode">강의자 모드</button>
+    </header>
 
-    <!-- Mobile Menu Toggle Button (visible only on small screens) -->
-    <div class="fixed top-4 left-4 z-50 hidden mobile-menu-btn p-2 rounded-md bg-white border border-gray-200 shadow-sm hover:bg-gray-100 cursor-pointer" id="menu-toggle">
-        <i class="ph ph-list text-2xl text-gray-700"></i>
+    <div id="setupBanner" class="banner hidden">
+      ⚠️ Firebase 설정이 아직 안 됐습니다. <code>index.html</code> 상단 <code>firebaseConfig</code> 값을
+      본인 프로젝트 값으로 교체하세요. 방법은 <code>README.md</code> 참고.
     </div>
 
-    <!-- Toast Notification Container -->
-    <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+    <!-- 강의자 전용 작성 영역 -->
+    <div id="teacherComposer" class="composer hidden">
+      <textarea id="input" placeholder="여기에 글을 적고 저장하세요 (여러 줄 가능)"></textarea>
+      <div class="composer-row">
+        <button id="saveBtn" class="btn-primary">저장</button>
+      </div>
+      <div class="bulk-row">
+        <button id="hideAllBtn">모두 숨기기</button>
+        <button id="showAllBtn">모두 보이기</button>
+      </div>
+    </div>
 
-    <!-- Sidebar Navigation -->
-    <nav id="sidebar">
-        <div class="px-4 py-2 mb-4">
-            <div class="flex items-center gap-2 font-semibold text-sm cursor-pointer hover:bg-gray-200 p-1 -ml-1 rounded transition-colors">
-                <div class="w-5 h-5 bg-blue-500 rounded text-white flex items-center justify-center text-xs">Ph</div>
-                고등학교 2학년 물리학
-            </div>
+    <div id="list" class="list"></div>
+    <div id="empty" class="empty hidden">아직 표시된 글이 없습니다.</div>
+
+    <!-- 강의자 전용 프로필 편집 (강의자 모드 맨 아래) -->
+    <div id="profileEditor" class="profile-editor hidden">
+      <button id="pfToggle" class="pf-toggle" type="button" aria-expanded="false" aria-controls="pfBody">
+        <span>프로필 카드 편집</span>
+        <span id="pfIcon" class="pf-icon">▸</span>
+      </button>
+      <div id="pfBody" class="pf-body hidden">
+        <label for="pfName">이름</label>
+        <input id="pfName" type="text" placeholder="이름" autocomplete="off" />
+        <label for="pfAffiliation">소속</label>
+        <input id="pfAffiliation" type="text" placeholder="소속" autocomplete="off" />
+        <label for="pfContact">Contact (여러 줄 입력 가능 — SNS, 이메일 등)</label>
+        <textarea id="pfContact" placeholder="예)&#10;Email: name@example.com&#10;Instagram: @handle"></textarea>
+        <div class="pe-row">
+          <button id="pfSaveBtn" class="btn-primary">프로필 저장</button>
         </div>
-        
-        <div class="text-xs font-semibold text-gray-400 px-4 mb-2">PAGES</div>
-        
-        <div class="sidebar-item active" onclick="navigate('home')">
-            <i class="ph ph-house mr-2 text-lg text-gray-500"></i>
-            메인 페이지
-        </div>
-        <div class="sidebar-item" onclick="navigate('guide')">
-            <i class="ph ph-compass mr-2 text-lg text-gray-500"></i>
-            탐구 안내
-        </div>
-        <div class="sidebar-item" onclick="navigate('assignment')">
-            <i class="ph ph-tray mr-2 text-lg text-gray-500"></i>
-            과제 제출 및 게시판
-        </div>
-        <div class="sidebar-item mt-6 border-t border-gray-200 pt-2" onclick="navigate('dashboard')">
-            <i class="ph ph-lock-key mr-2 text-lg text-gray-500"></i>
-            교사 대시보드
-        </div>
-    </nav>
+      </div>
+    </div>
 
-    <!-- Main Content Container -->
-    <main id="main-content">
-        
-        <!-- ==================== HOME PAGE ==================== -->
-        <section id="page-home" class="page-section active content-container">
-            <!-- Cover Image (Notion style) -->
-            <div class="w-full h-48 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg mb-8 mt-4 overflow-hidden relative">
-                <!-- Abstract representation of energy -->
-                <div class="absolute inset-0 opacity-20">
-                    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M0,100 C150,200 350,0 500,100 C650,200 850,0 1000,100 L1000,200 L0,200 Z" fill="#3b82f6"/>
-                    </svg>
-                </div>
-            </div>
-            
-            <h1 class="page-title">
-                <span class="text-5xl">⚡</span> 에너지 보존 법칙 탐구 프로젝트
-            </h1>
-            
-            <div class="callout mt-8">
-                <div>💡</div>
-                <div class="text-gray-700">
-                    <strong>환영합니다!</strong> 본 프로젝트는 고등학교 2학년 물리학 수업의 일환으로, 데이터를 직접 수집하고 분석하여 '역학적 에너지 보존 법칙'을 깊이 있게 이해하는 것을 목표로 합니다.
-                </div>
-            </div>
+    <!-- 프로필 카드 (양쪽 화면 공통 푸터) -->
+    <footer id="profileCard" class="profile-footer hidden"></footer>
+  </div>
 
-            <h2 class="section-title">📌 공지사항</h2>
-            <ul class="space-y-3 mt-4 text-gray-700">
-                <li class="flex items-start gap-2">
-                    <i class="ph-fill ph-check-circle text-blue-500 mt-1"></i>
-                    <div>
-                        <strong>[필독] 탐구 활동 안내서 배포</strong>
-                        <p class="text-sm text-gray-500">탐구 활동에 필요한 세부 지침이 포함된 문서를 확인하세요. (2026.07.25)</p>
-                    </div>
-                </li>
-                <li class="flex items-start gap-2">
-                    <i class="ph-fill ph-check-circle text-blue-500 mt-1"></i>
-                    <div>
-                        <strong>조별 역할 분담 제출 안내</strong>
-                        <p class="text-sm text-gray-500">다음 주 금요일까지 각 조의 역할 분담표를 '과제 제출' 메뉴에 업로드 바랍니다.</p>
-                    </div>
-                </li>
-            </ul>
+  <!-- 복사 완료 모달 -->
+  <div id="copyModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="copyModalMsg">
+    <div class="modal">
+      <div class="modal-icon" aria-hidden="true">✓</div>
+      <div id="copyModalMsg" class="modal-msg">복사되었습니다</div>
+      <div id="copyModalSub" class="modal-sub"></div>
+      <button id="copyModalOk" class="btn-primary modal-ok" type="button">확인</button>
+    </div>
+  </div>
 
-            <h2 class="section-title">🎯 프로젝트 개요</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div class="border border-gray-200 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onclick="navigate('guide')">
-                    <h3 class="font-bold flex items-center gap-2"><i class="ph-fill ph-book-open text-gray-500"></i> 탐구 안내 보기</h3>
-                    <p class="text-sm text-gray-600 mt-2">평가 기준 및 상세 일정을 확인하세요.</p>
-                </div>
-                <div class="border border-gray-200 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onclick="navigate('assignment')">
-                    <h3 class="font-bold flex items-center gap-2"><i class="ph-fill ph-chat-circle text-gray-500"></i> 질의응답</h3>
-                    <p class="text-sm text-gray-600 mt-2">궁금한 점은 언제든지 게시판에 남겨주세요.</p>
-                </div>
-            </div>
-            
-            <div class="mt-12 text-sm text-gray-400 border-t pt-4">
-                Last edited: Today
-            </div>
-        </section>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getDatabase, ref, push, onValue, update, remove, get, child
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-        <!-- ==================== GUIDE PAGE ==================== -->
-        <section id="page-guide" class="page-section content-container">
-            <h1 class="page-title">
-                <span class="text-5xl">🧭</span> 탐구 안내
-            </h1>
-            
-            <p class="text-gray-700 text-lg mb-8 leading-relaxed">
-                이 페이지에서는 데이터 분석을 통한 에너지 보존 법칙 탐구의 단계별 가이드를 제공합니다. 각 단계를 차례대로 확인하며 프로젝트를 진행해 주세요.
-            </p>
-            
-            <!-- Download Button -->
-            <div class="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200 flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <i class="ph ph-file-pdf text-3xl text-red-500"></i>
-                    <div>
-                        <div class="font-medium text-gray-800">탐구활동_워크북.pdf</div>
-                        <div class="text-xs text-gray-500">2.4 MB</div>
-                    </div>
-                </div>
-                <a href="#" class="btn-download" onclick="triggerDownload(event)">
-                    <i class="ph ph-download-simple"></i> 다운로드
-                </a>
-            </div>
+    // ====== Firebase 설정 (본인 값으로 교체하세요 — README.md 참고) ======
+    const firebaseConfig = {
+      apiKey: "AIzaSyAKrNGCO-9vvtO6vM-NK_atwKl4OAmmtCw",
+      authDomain: "lecture-dashboard-e3e86.firebaseapp.com",
+      databaseURL: "https://lecture-dashboard-e3e86-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "lecture-dashboard-e3e86",
+      storageBucket: "lecture-dashboard-e3e86.firebasestorage.app",
+      messagingSenderId: "329153867015",
+      appId: "1:329153867015:web:ea43fd013388b464f569a2"
+    };
+    // ====================================================================
 
-            <h2 class="section-title">📊 단계별 탐구 과정</h2>
-            
-            <!-- Tab System -->
-            <div class="mt-4 border border-gray-200 rounded-lg overflow-hidden bg-white">
-                <div class="tab-header bg-gray-50 border-b-0 px-2 pt-2 mb-0">
-                    <div class="tab-btn active" onclick="switchTab('tab1', this)">1단계: 실험 설계</div>
-                    <div class="tab-btn" onclick="switchTab('tab2', this)">2단계: 데이터 수집</div>
-                    <div class="tab-btn" onclick="switchTab('tab3', this)">3단계: 분석 및 결론</div>
-                </div>
-                
-                <div class="p-6">
-                    <!-- Tab 1 Content -->
-                    <div id="tab1" class="tab-content active">
-                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
-                            <i class="ph-fill ph-number-circle-one text-blue-500"></i> 가설 설정 및 실험 장치 구성
-                        </h3>
-                        <p class="mb-4 text-gray-700">자유 낙하 또는 진자 운동과 같은 역학적 시스템을 선택하고, 위치 에너지와 운동 에너지의 변환에 대한 가설을 세웁니다.</p>
-                        
-                        <div class="bg-blue-50 p-4 rounded-md border-l-4 border-blue-400 mb-4 text-sm text-gray-800">
-                            <strong>체크리스트:</strong>
-                            <ul class="list-disc ml-5 mt-2 space-y-1">
-                                <li>측정할 변수(높이, 속도, 질량)가 명확한가?</li>
-                                <li>마찰이나 공기 저항을 최소화할 방안이 있는가?</li>
-                                <li>조원 간의 역할이 분담되었는가?</li>
-                            </ul>
-                        </div>
-                    </div>
+    const TEACHER_PASSWORD = "4496";
+    const DB_PATH = "rooms/default/messages";
+    const PROFILE_PATH = "rooms/default/profile";
 
-                    <!-- Tab 2 Content -->
-                    <div id="tab2" class="tab-content">
-                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
-                            <i class="ph-fill ph-number-circle-two text-green-500"></i> 센서 및 트래킹 앱 활용
-                        </h3>
-                        <p class="mb-4 text-gray-700">스마트폰의 가속도 센서 앱(phyphox 등)이나 영상 분석 프로그램(Tracker 등)을 사용하여 물체의 운동 데이터를 수집합니다.</p>
-                        
-                        <!-- NEW: Example Excel Download -->
-                        <div class="mb-4 flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
-                            <i class="ph-fill ph-file-xls text-3xl text-green-600"></i>
-                            <div class="flex-grow">
-                                <div class="font-medium text-gray-800">예시 실험 데이터</div>
-                                <div class="text-xs text-gray-500">자유낙하 운동을 가정한 높이 및 속도 데이터 (example_data.xlsx)</div>
-                            </div>
-                            <button onclick="downloadExampleExcel()" class="btn-download bg-white border-green-200 text-green-700 hover:bg-green-100">
-                                <i class="ph ph-download-simple"></i> 다운로드
-                            </button>
-                        </div>
+    const configured = firebaseConfig.apiKey !== "YOUR_API_KEY";
+    let db = null, messagesRef = null, profileRef = null;
+    if (configured) {
+      const app = initializeApp(firebaseConfig);
+      db = getDatabase(app);
+      messagesRef = ref(db, DB_PATH);
+      profileRef = ref(db, PROFILE_PATH);
+    } else {
+      document.getElementById("setupBanner").classList.remove("hidden");
+    }
 
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div class="border rounded p-3 text-center bg-gray-50">
-                                <i class="ph ph-device-mobile-camera text-2xl mb-2 text-gray-600"></i>
-                                <div class="font-medium text-sm">센서 앱 활용법</div>
-                            </div>
-                            <div class="border rounded p-3 text-center bg-gray-50">
-                                <i class="ph ph-video-camera text-2xl mb-2 text-gray-600"></i>
-                                <div class="font-medium text-sm">영상 분석 가이드</div>
-                            </div>
-                        </div>
-                    </div>
+    // ---- State ----
+    let messages = [];            // [{id, text, createdAt, hidden}]
+    let mode = "student";         // 'student' | 'teacher'
+    let editingId = null;
+    const expanded = new Set();   // 3줄 클램프를 펼쳐둔 메시지 id
+    let renderToken = 0;          // 겹친 렌더의 지연 측정 무효화용
+    let profile = { name: "", affiliation: "", contact: "" };
 
-                    <!-- Tab 3 Content -->
-                    <div id="tab3" class="tab-content">
-                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
-                            <i class="ph-fill ph-number-circle-three text-purple-500"></i> 실험 데이터 분석 및 그래프
-                        </h3>
-                        <p class="mb-4 text-gray-700">수집한 엑셀(.xlsx) 데이터를 업로드하면, 에너지를 자동으로 계산하고 역학적 에너지가 보존되는지 확인할 수 있는 그래프를 그려줍니다. (이곳에서 분석된 결과는 과제 제출 시 자동으로 연동됩니다.)</p>
-                        
-                        <!-- NEW: Excel Upload & Chart Area -->
-                        <div class="mb-6 p-6 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50 text-center relative hover:bg-blue-100 transition-colors">
-                            <input type="file" id="excel-upload" accept=".xlsx, .xls, .csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleExcelUpload(event)">
-                            <i class="ph ph-upload-simple text-4xl text-blue-500 mb-2"></i>
-                            <div class="font-medium text-blue-800">여기를 클릭하거나 데이터 파일(.xlsx)을 드래그하여 업로드하세요</div>
-                            <div class="text-xs text-blue-600 mt-1">필수 열: 시간(s), 높이(m), 속도(m/s)</div>
-                        </div>
-                        
-                        <div id="analysis-results" class="hidden space-y-6">
-                            <div class="bg-white p-4 border border-gray-200 rounded-lg shadow-sm">
-                                <h4 class="font-bold text-gray-800 mb-3 border-b pb-2 flex items-center gap-2"><i class="ph-fill ph-chart-line-up text-blue-500"></i> 에너지 보존 그래프</h4>
-                                <div style="position: relative; height:300px; width:100%">
-                                    <canvas id="energyChart"></canvas>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white p-4 border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
-                                <h4 class="font-bold text-gray-800 mb-3 border-b pb-2 flex items-center gap-2"><i class="ph-fill ph-table text-green-500"></i> 분석 데이터 (미리보기)</h4>
-                                <table class="min-w-full text-sm text-center border-collapse" id="analysis-table">
-                                    <thead class="bg-gray-50 text-gray-600">
-                                        <tr>
-                                            <th class="border p-2">시간(s)</th>
-                                            <th class="border p-2">높이(m)</th>
-                                            <th class="border p-2">속도(m/s)</th>
-                                            <th class="border p-2 text-blue-600">위치에너지(J)</th>
-                                            <th class="border p-2 text-red-600">운동에너지(J)</th>
-                                            <th class="border p-2 text-purple-600 font-bold">역학적에너지(J)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="analysis-table-body" class="text-gray-700 divide-y">
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <h2 class="section-title">📋 평가 기준 (루브릭)</h2>
-            <div class="overflow-x-auto mt-4">
-                <table class="min-w-full text-left text-sm text-gray-700 border-collapse">
-                    <thead class="bg-gray-100 border-b border-gray-300">
-                        <tr>
-                            <th class="px-4 py-3 font-semibold">평가 항목</th>
-                            <th class="px-4 py-3 font-semibold">우수 (A)</th>
-                            <th class="px-4 py-3 font-semibold">보통 (B)</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        <tr>
-                            <td class="px-4 py-3 font-medium bg-gray-50">데이터 수집</td>
-                            <td class="px-4 py-3">정확한 도구 활용, 오차 최소화 노력 뚜렷함</td>
-                            <td class="px-4 py-3">도구 활용은 적절하나 일부 오차 발생</td>
-                        </tr>
-                        <tr>
-                            <td class="px-4 py-3 font-medium bg-gray-50">데이터 분석</td>
-                            <td class="px-4 py-3">에너지 계산이 정확하고 그래프 해석이 논리적임</td>
-                            <td class="px-4 py-3">계산은 대체로 맞으나 해석이 다소 부족함</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
+    // ---- Elements ----
+    const listEl = document.getElementById("list");
+    const emptyEl = document.getElementById("empty");
+    const composerEl = document.getElementById("teacherComposer");
+    const modeToggle = document.getElementById("modeToggle");
+    const titleEl = document.getElementById("title");
+    const inputEl = document.getElementById("input");
+    const profileEditorEl = document.getElementById("profileEditor");
+    const profileCardEl = document.getElementById("profileCard");
+    const pfNameEl = document.getElementById("pfName");
+    const pfAffiliationEl = document.getElementById("pfAffiliation");
+    const pfContactEl = document.getElementById("pfContact");
+    const pfToggleEl = document.getElementById("pfToggle");
+    const pfBodyEl = document.getElementById("pfBody");
+    const pfIconEl = document.getElementById("pfIcon");
 
-        <!-- ==================== ASSIGNMENT PAGE ==================== -->
-        <section id="page-assignment" class="page-section content-container">
-            <h1 class="page-title">
-                <span class="text-5xl">📥</span> 과제 제출 및 게시판
-            </h1>
-            
-            <p class="text-gray-700 mb-8">
-                조별 탐구 결과물 업로드 및 궁금한 점을 질문하는 공간입니다.
-            </p>
+    // ---- Mode ----
+    function enterTeacher() {
+      const pw = window.prompt("강의자 비밀번호를 입력하세요");
+      if (pw === null) return;
+      if (pw !== TEACHER_PASSWORD) { alert("비밀번호가 올바르지 않습니다."); return; }
+      mode = "teacher";
+      location.hash = "teacher";
+      applyMode();
+    }
+    function exitTeacher() {
+      mode = "student";
+      editingId = null;
+      if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+      applyMode();
+    }
+    function applyMode() {
+      const teacher = mode === "teacher";
+      composerEl.classList.toggle("hidden", !teacher);
+      profileEditorEl.classList.toggle("hidden", !teacher);
+      modeToggle.textContent = teacher ? "수강생 화면으로" : "강의자 모드";
+      titleEl.textContent = teacher ? "강의 보드 · 강의자" : "강의 보드";
+      if (teacher) fillProfileInputs();
+      render();
+    }
+    modeToggle.addEventListener("click", () => (mode === "teacher" ? exitTeacher() : enterTeacher()));
 
-            <h2 class="section-title">과제 제출 폼 (UI 모형)</h2>
-            
-            <form class="mt-6 border border-gray-200 rounded-lg p-6 bg-white shadow-sm" onsubmit="submitForm(event)">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">조 이름 (예: 1조)</label>
-                    <input type="text" id="group-name" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm" placeholder="조 이름을 입력하세요" required>
-                </div>
-                
-                <!-- NEW: Data Link Status -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">분석 데이터 연동</label>
-                    <div id="attached-data-status" class="p-3 bg-gray-50 border border-gray-200 rounded-md flex items-center gap-2 text-sm text-gray-500 transition-all">
-                        <i class="ph ph-link-break text-lg"></i>
-                        <span>아직 탐구 안내(3단계)에서 분석된 데이터가 없습니다.</span>
-                    </div>
-                </div>
+    // ---- Data ops ----
+    function saveMessage() {
+      if (!configured) return alert("Firebase 설정이 필요합니다. README.md를 확인하세요.");
+      const text = inputEl.value.trim();
+      if (!text) return;
+      const now = Date.now();
+      push(messagesRef, { text, createdAt: now, updatedAt: now, hidden: false, order: now });
+      inputEl.value = "";
+      inputEl.focus();
+    }
+    function updateText(id, text) {
+      update(ref(db, `${DB_PATH}/${id}`), { text, updatedAt: Date.now() });
+    }
+    function setHidden(id, hidden) {
+      update(ref(db, `${DB_PATH}/${id}`), { hidden });
+    }
+    function deleteMessage(id) {
+      if (!confirm("이 글을 삭제할까요?")) return;
+      remove(ref(db, `${DB_PATH}/${id}`));
+    }
+    function setAllHidden(hidden) {
+      if (!messages.length) return;
+      const updates = {};
+      messages.forEach(m => { updates[`${m.id}/hidden`] = hidden; });
+      update(messagesRef, updates);
+    }
+    // 정렬 기준값(order 없으면 createdAt로 대체)
+    function effOrder(m) {
+      return (m.order !== undefined && m.order !== null) ? m.order : m.createdAt;
+    }
+    // dir: -1 = 위로, +1 = 아래로 (강의자 전체 목록 기준으로 이웃과 order 교환)
+    function moveMessage(id, dir) {
+      const sorted = sortMessages(messages);
+      const i = sorted.findIndex(m => m.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= sorted.length) return;
+      const a = sorted[i], b = sorted[j];
+      update(messagesRef, {
+        [`${a.id}/order`]: effOrder(b),
+        [`${b.id}/order`]: effOrder(a)
+      });
+    }
+    // 최신/상단 우선(order 내림차순), 동률이면 createdAt·id로 안정 정렬
+    function sortMessages(arr) {
+      return [...arr].sort((a, b) =>
+        (effOrder(b) - effOrder(a)) ||
+        (b.createdAt - a.createdAt) ||
+        (a.id < b.id ? 1 : -1)
+      );
+    }
 
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">제출 파일 (추가 보고서 등)</label>
-                    <div class="flex items-center justify-center w-full">
-                        <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                <i class="ph ph-upload-simple text-3xl text-gray-400 mb-2"></i>
-                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">클릭하여 업로드</span> 또는 드래그 앤 드롭</p>
-                            </div>
-                            <input type="file" class="hidden" />
-                        </label>
-                    </div>
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">비고 및 질문사항</label>
-                    <textarea id="submission-note" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm" rows="3" placeholder="제출 시 남기고 싶은 말을 적어주세요."></textarea>
-                </div>
-                
-                <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700 transition-colors">
-                    제출하기
-                </button>
-            </form>
+    document.getElementById("saveBtn").addEventListener("click", saveMessage);
+    document.getElementById("hideAllBtn").addEventListener("click", () => setAllHidden(true));
+    document.getElementById("showAllBtn").addEventListener("click", () => setAllHidden(false));
+    inputEl.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") saveMessage();
+    });
 
-            <h2 class="section-title mt-12">Q&A 게시판</h2>
-            
-            <div class="mt-4 space-y-4">
-                <!-- Post 1 -->
-                <div class="border border-gray-200 rounded-lg p-4 bg-white">
-                    <div class="flex items-center gap-2 mb-2">
-                        <div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">3조</div>
-                        <span class="font-medium text-sm text-gray-800">Tracker 프로그램에서 질량 중심 설정이 안 돼요.</span>
-                    </div>
-                    <p class="text-sm text-gray-600 ml-8 mb-2">영상 화질이 낮아서 그런지 자동 트래킹이 자꾸 끊깁니다. 수동으로 찍는 게 나을까요?</p>
-                    <div class="ml-8 mt-3 bg-gray-50 p-3 rounded border border-gray-100">
-                        <div class="text-xs font-bold text-gray-700 mb-1">선생님</div>
-                        <p class="text-sm text-gray-600">네, 화질이 낮아 대비가 명확하지 않으면 자동 트래킹이 어려울 수 있습니다. shift 키를 누른 상태로 직접 포인트를 찍어 수동으로 진행해 보세요.</p>
-                    </div>
-                </div>
-                
-                <!-- Post 2 -->
-                <div class="border border-gray-200 rounded-lg p-4 bg-white">
-                    <div class="flex items-center gap-2 mb-2">
-                        <div class="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">5조</div>
-                        <span class="font-medium text-sm text-gray-800">에너지 계산 시트 수식 질문입니다.</span>
-                    </div>
-                    <p class="text-sm text-gray-600 ml-8">구글 시트에서 속도를 구할 때 바로 전 시간 셀과 현재 시간 셀을 빼는게 맞나요?</p>
-                </div>
-            </div>
-        </section>
+    // ---- Profile ----
+    function fillProfileInputs() {
+      // 편집 중(포커스)인 칸은 덮어쓰지 않음
+      if (document.activeElement !== pfNameEl) pfNameEl.value = profile.name || "";
+      if (document.activeElement !== pfAffiliationEl) pfAffiliationEl.value = profile.affiliation || "";
+      if (document.activeElement !== pfContactEl) pfContactEl.value = profile.contact || "";
+    }
+    function saveProfile() {
+      if (!configured) return alert("Firebase 설정이 필요합니다. README.md를 확인하세요.");
+      update(profileRef, {
+        name: pfNameEl.value.trim(),
+        affiliation: pfAffiliationEl.value.trim(),
+        contact: pfContactEl.value.trim()
+      });
+      const btn = document.getElementById("pfSaveBtn");
+      const original = btn.textContent;
+      btn.textContent = "저장됨";
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1000);
+    }
+    function renderProfile() {
+      const has = !!(profile.name || profile.affiliation || profile.contact);
+      profileCardEl.classList.toggle("hidden", !has);
+      profileCardEl.innerHTML = "";
+      if (!has) return;
+      if (profile.name) {
+        const d = document.createElement("div");
+        d.className = "pf-name";
+        d.textContent = profile.name;
+        profileCardEl.appendChild(d);
+      }
+      if (profile.affiliation) {
+        const d = document.createElement("div");
+        d.textContent = profile.affiliation;
+        profileCardEl.appendChild(d);
+      }
+      if (profile.contact) {
+        const label = document.createElement("div");
+        label.className = "pf-contact-label";
+        label.textContent = "Contact";
+        const d = document.createElement("div");
+        d.className = "pf-contact";
+        d.textContent = profile.contact;
+        profileCardEl.appendChild(label);
+        profileCardEl.appendChild(d);
+      }
+      const year = new Date().getFullYear();
+      const who = profile.name ? " " + profile.name : "";
+      const c = document.createElement("div");
+      c.className = "pf-copy";
+      c.textContent = `© ${year}${who} · 비영리 목적의 복사·배포 허용, 상업적 이용 금지 (CC BY-NC)`;
+      profileCardEl.appendChild(c);
+    }
 
-        <!-- ==================== DASHBOARD PAGE ==================== -->
-        <section id="page-dashboard" class="page-section content-container">
-            <h1 class="page-title">
-                <span class="text-5xl">🔒</span> 교사 대시보드
-            </h1>
-            
-            <p class="text-gray-700 mb-8">
-                학생들이 제출한 탐구 데이터와 과제물을 모아보는 공간입니다.
-            </p>
+    document.getElementById("pfSaveBtn").addEventListener("click", saveProfile);
+    pfToggleEl.addEventListener("click", () => {
+      const collapsed = pfBodyEl.classList.toggle("hidden");
+      pfIconEl.textContent = collapsed ? "▸" : "▾";
+      pfToggleEl.setAttribute("aria-expanded", String(!collapsed));
+    });
 
-            <!-- Password Gate -->
-            <div id="dashboard-login" class="mt-8 border border-gray-200 rounded-lg p-8 bg-white shadow-sm max-w-md mx-auto text-center">
-                <i class="ph-fill ph-lock-key text-4xl text-gray-400 mb-4"></i>
-                <h2 class="text-lg font-bold mb-2">관리자 권한 필요</h2>
-                <p class="text-sm text-gray-500 mb-4">대시보드에 접근하려면 비밀번호를 입력하세요. (힌트: 1234)</p>
-                <div class="flex gap-2">
-                    <input type="password" id="dashboard-pwd" class="flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm" placeholder="비밀번호 입력" onkeydown="if(event.key === 'Enter') checkDashboardAuth()">
-                    <button onclick="checkDashboardAuth()" class="bg-gray-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700">접속</button>
-                </div>
-            </div>
+    // ---- Clipboard + 복사 완료 모달 ----
+    const copyModalEl = document.getElementById("copyModal");
+    const copyModalSubEl = document.getElementById("copyModalSub");
+    let copyModalTimer = null;
 
-            <!-- Dashboard Content (Hidden by default) -->
-            <div id="dashboard-content" class="hidden mt-6">
-                <div class="flex justify-between items-end mb-4">
-                    <h2 class="text-xl font-bold text-gray-800">과제 제출 현황</h2>
-                    <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">총 <span id="submission-count" class="font-bold text-blue-600">0</span>건 제출됨</span>
-                </div>
-                
-                <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full text-left text-sm text-gray-700">
-                            <thead class="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th class="px-4 py-3 font-semibold w-1/4">제출 일시</th>
-                                    <th class="px-4 py-3 font-semibold w-1/6">조 이름</th>
-                                    <th class="px-4 py-3 font-semibold w-1/4">자동 연동 데이터</th>
-                                    <th class="px-4 py-3 font-semibold">비고 및 질문사항</th>
-                                </tr>
-                            </thead>
-                            <tbody id="dashboard-table-body" class="divide-y divide-gray-100">
-                                <!-- Dynamic rows will go here -->
-                                <tr>
-                                    <td colspan="4" class="px-4 py-8 text-center text-gray-500">아직 제출된 과제가 없습니다.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </section>
+    function showCopyModal(text) {
+      copyModalSubEl.textContent = text;
+      copyModalEl.classList.remove("hidden");
+      clearTimeout(copyModalTimer);
+      copyModalTimer = setTimeout(hideCopyModal, 1400);
+    }
+    function hideCopyModal() {
+      clearTimeout(copyModalTimer);
+      copyModalEl.classList.add("hidden");
+    }
+    document.getElementById("copyModalOk").addEventListener("click", hideCopyModal);
+    copyModalEl.addEventListener("click", (e) => {
+      if (e.target === copyModalEl) hideCopyModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hideCopyModal();
+    });
 
-    </main>
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); } catch {}
+        document.body.removeChild(ta);
+      }
+      showCopyModal(text);
+    }
 
-    <!-- Firebase SDK & Integration (Module) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    // ---- Time formatting ----
+    const pad2 = (n) => String(n).padStart(2, "0");
+    // 강의자용 절대시간: MM-DD HH:MM
+    function formatAbsolute(ts) {
+      const d = new Date(ts);
+      return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    }
+    // 수강생용 상대시간: 최대 단위만 표기 (초/분/시간/일/월/년 전)
+    function formatRelative(ts) {
+      const sec = Math.floor(Math.max(0, Date.now() - ts) / 1000);
+      if (sec < 60) return pad2(sec) + "초 전";
+      const min = Math.floor(sec / 60);
+      if (min < 60) return pad2(min) + "분 전";
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return pad2(hr) + "시간 전";
+      const day = Math.floor(hr / 24);
+      if (day < 30) return pad2(day) + "일 전";
+      const month = Math.floor(day / 30);
+      if (month < 12) return pad2(month) + "월 전";
+      return pad2(Math.floor(month / 12)) + "년 전";
+    }
+    // 수강생 화면 상대시간 라벨을 주기적으로 갱신(재렌더 없이)
+    function updateRelativeTimes() {
+      document.querySelectorAll('#list .time[data-rel]').forEach(el => {
+        el.textContent = formatRelative(Number(el.dataset.ts));
+      });
+    }
+    setInterval(updateRelativeTimes, 1000);
 
-        // 사용자가 제공한 Firebase 설정
-        const firebaseConfig = {
-            apiKey: "AIzaSyDVRXEWmkFXxwX6R3YDc7s8ahiA41sIOtc",
-            authDomain: "energy-conservation-c1fbd.firebaseapp.com",
-            projectId: "energy-conservation-c1fbd",
-            storageBucket: "energy-conservation-c1fbd.firebasestorage.app",
-            messagingSenderId: "89158059744",
-            appId: "1:89158059744:web:0c4a250610bbb783f43285"
-        };
+    // ---- Render ----
+    function render() {
+      const teacher = mode === "teacher";
+      // 수강생: 숨김 제외. 강의자: 전부. 둘 다 최신 위.
+      // 수강생: 숨김 제외. 강의자: 전부. order 기준 상단 우선.
+      const visible = sortMessages(messages.filter(m => teacher || !m.hidden));
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        
-        // 환경 변수 기반 앱 ID (필수 경로 규칙)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-energy-app';
+      listEl.innerHTML = "";
+      emptyEl.classList.toggle("hidden", visible.length > 0);
 
-        let currentUser = null;
+      const clampTargets = [];   // [{id, textEl, moreBtn}] — 렌더 후 넘침 여부 측정
 
-        // 필수 규칙 3: 쿼리 전 인증
-        const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Firebase Auth Error:", error);
-            }
-        };
+      visible.forEach((m, idx) => {
+        const bubble = document.createElement("div");
+        bubble.className = "bubble" + (m.hidden ? " is-hidden" : "");
 
-        // 실시간 데이터 리스너 설정
-        function setupRealtimeListener() {
-            if (!currentUser) return;
-            
-            // 필수 규칙 1: 지정된 공개 데이터 경로 사용
-            const submissionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'submissions');
-            
-            // 에러 콜백을 포함한 onSnapshot
-            onSnapshot(submissionsRef, (snapshot) => {
-                const dataList = [];
-                snapshot.forEach((doc) => {
-                    dataList.push({ id: doc.id, ...doc.data() });
-                });
-                
-                // 필수 규칙 2: 복합 쿼리 방지를 위해 JS 메모리에서 정렬 처리
-                dataList.sort((a, b) => {
-                    const tA = a.createdAt ? a.createdAt.toMillis() : 0;
-                    const tB = b.createdAt ? b.createdAt.toMillis() : 0;
-                    return tA - tB; // 시간순 정렬 (오름차순)
-                });
+        // 왼쪽 순서 번호 (표시되는 목록 기준 — 수강생은 숨김 제외 후 재부여)
+        const numEl = document.createElement("div");
+        numEl.className = "num";
+        numEl.textContent = String(idx + 1);
 
-                // 글로벌 함수 호출로 기존 JS 상태와 동기화
-                if (window.updateAssignmentsState) {
-                    window.updateAssignmentsState(dataList);
-                }
-            }, (error) => {
-                console.error("Firestore onSnapshot Error:", error);
-            });
+        if (teacher && editingId === m.id) {
+          bubble.classList.add("editing");
+          const ta = document.createElement("textarea");
+          ta.className = "edit-area";
+          ta.value = m.text;
+          const row = document.createElement("div");
+          row.className = "edit-row";
+          const save = document.createElement("button");
+          save.className = "btn-primary";
+          save.textContent = "저장";
+          save.addEventListener("click", () => {
+            const v = ta.value.trim();
+            if (v) updateText(m.id, v);
+            editingId = null; render();
+          });
+          const cancel = document.createElement("button");
+          cancel.textContent = "취소";
+          cancel.addEventListener("click", () => { editingId = null; render(); });
+          row.append(save, cancel);
+          bubble.append(ta, row);
+          listEl.appendChild(bubble);
+          ta.focus();
+          return;
         }
 
-        // 인증 상태 확인
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                setupRealtimeListener();
-            } else {
-                currentUser = null;
-            }
+        // 본문 + 자세히 버튼 (3줄 초과 시에만 버튼 노출)
+        const contentEl = document.createElement("div");
+        contentEl.className = "content";
+
+        const textEl = document.createElement("div");
+        textEl.className = "text clamped";
+        textEl.textContent = m.text;
+
+        const moreBtn = document.createElement("button");
+        moreBtn.type = "button";
+        moreBtn.className = "btn-more hidden";
+        moreBtn.textContent = "자세히";
+        moreBtn.addEventListener("click", (e) => {
+          e.stopPropagation();   // 버블 클릭(복사)과 분리
+          const isExpanded = expanded.has(m.id);
+          if (isExpanded) expanded.delete(m.id); else expanded.add(m.id);
+          textEl.classList.toggle("clamped", isExpanded);
+          moreBtn.textContent = isExpanded ? "자세히" : "접기";
         });
 
-        // 전역으로 접근 가능한 DB 저장 함수 노출
-        window.saveSubmissionToDB = async (submissionData) => {
-            if (!currentUser) {
-                throw new Error("서버 인증 중입니다. 잠시 후 다시 시도해주세요.");
-            }
-            const submissionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'submissions');
-            await addDoc(submissionsRef, {
-                ...submissionData,
-                userId: currentUser.uid,
-                createdAt: serverTimestamp()
-            });
-        };
+        contentEl.append(textEl, moreBtn);
+        clampTargets.push({ id: m.id, textEl, moreBtn });
 
-        // 인증 시작
-        initAuth();
-    </script>
-
-    <!-- JavaScript functionality -->
-    <script>
-        // Page Navigation Logic
-        function navigate(pageId) {
-            // Hide all pages
-            const pages = document.querySelectorAll('.page-section');
-            pages.forEach(page => page.classList.remove('active'));
-            
-            // Show target page
-            document.getElementById('page-' + pageId).classList.add('active');
-            
-            // Update sidebar active state
-            const sidebarItems = document.querySelectorAll('.sidebar-item');
-            sidebarItems.forEach(item => item.classList.remove('active'));
-            
-            // Find and activate the clicked item (using simple matching for demo)
-            event.currentTarget.classList.add('active');
-            
-            // Scroll to top
-            document.getElementById('main-content').scrollTop = 0;
-            
-            // On mobile, close sidebar after navigation
-            if (window.innerWidth <= 768) {
-                document.getElementById('sidebar').classList.remove('open');
-            }
+        // 버튼 왼쪽 작은 시간 표기 (강의자=절대시간, 수강생=상대시간)
+        const timeEl = document.createElement("div");
+        timeEl.className = "time";
+        if (teacher) {
+          timeEl.textContent = formatAbsolute(m.updatedAt);
+        } else {
+          timeEl.textContent = formatRelative(m.updatedAt);
+          timeEl.dataset.ts = String(m.updatedAt);
+          timeEl.dataset.rel = "1";
         }
 
-        // Tab Switching Logic
-        function switchTab(tabId, clickedBtn) {
-            // Hide all tab contents inside the current container
-            const container = clickedBtn.closest('.tab-header').nextElementSibling;
-            const contents = container.querySelectorAll('.tab-content');
-            contents.forEach(content => content.classList.remove('active'));
-            
-            // Remove active class from all buttons in this header
-            const header = clickedBtn.closest('.tab-header');
-            const btns = header.querySelectorAll('.tab-btn');
-            btns.forEach(btn => btn.classList.remove('active'));
-            
-            // Show target tab content and activate button
-            document.getElementById(tabId).classList.add('active');
-            clickedBtn.classList.add('active');
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        if (teacher) {
+          const editBtn = document.createElement("button");
+          editBtn.textContent = "수정";
+          editBtn.addEventListener("click", () => { editingId = m.id; render(); });
+
+          const hideBtn = document.createElement("button");
+          hideBtn.textContent = m.hidden ? "보이기" : "숨기기";
+          hideBtn.addEventListener("click", () => setHidden(m.id, !m.hidden));
+
+          const delBtn = document.createElement("button");
+          delBtn.className = "btn-danger";
+          delBtn.textContent = "삭제";
+          delBtn.addEventListener("click", () => deleteMessage(m.id));
+
+          actions.append(editBtn, hideBtn, delBtn);
+
+          // 오른쪽 위/아래 순서 변경 버튼
+          const reorder = document.createElement("div");
+          reorder.className = "reorder";
+          const upBtn = document.createElement("button");
+          upBtn.textContent = "▲";
+          upBtn.title = "위로";
+          upBtn.disabled = idx === 0;
+          upBtn.addEventListener("click", () => moveMessage(m.id, -1));
+          const downBtn = document.createElement("button");
+          downBtn.textContent = "▼";
+          downBtn.title = "아래로";
+          downBtn.disabled = idx === visible.length - 1;
+          downBtn.addEventListener("click", () => moveMessage(m.id, 1));
+          reorder.append(upBtn, downBtn);
+
+          bubble.append(numEl, contentEl, timeEl, actions, reorder);
+        } else {
+          // 복사 버튼 없음 — 버블 자체를 클릭하면 복사
+          bubble.classList.add("copyable");
+          bubble.title = "클릭하면 복사됩니다";
+          bubble.addEventListener("click", () => {
+            // 텍스트를 직접 선택(드래그)한 경우엔 복사 동작을 건너뜀
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && bubble.contains(sel.anchorNode)) return;
+            copyText(m.text);
+          });
+
+          bubble.append(numEl, contentEl, timeEl);
         }
 
-        // Mobile Menu Toggle
-        document.getElementById('menu-toggle').addEventListener('click', function() {
-            document.getElementById('sidebar').classList.toggle('open');
+        listEl.appendChild(bubble);
+      });
+
+      // 붙인 직후 동기 측정 — 3줄을 넘칠 때만 '자세히' 노출, 펼쳐둔 항목은 상태 복원.
+      // (rAF를 쓰면 탭이 백그라운드일 때 프레임이 안 와서 버튼이 안 나타남)
+      applyClamp(clampTargets);
+      // 웹폰트가 늦게 적용되면 줄 수가 달라질 수 있어 한 번 더 측정
+      const token = ++renderToken;
+      if (document.fonts && document.fonts.status !== "loaded") {
+        document.fonts.ready.then(() => {
+          if (token === renderToken) applyClamp(clampTargets);
         });
+      }
+    }
 
-        // Close sidebar if clicking outside on mobile
-        document.getElementById('main-content').addEventListener('click', function() {
-            if (window.innerWidth <= 768) {
-                document.getElementById('sidebar').classList.remove('open');
-            }
-        });
-
-        // Toast Notification System
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            
-            // Notion style notification popup
-            toast.className = `px-4 py-3 rounded shadow-lg text-sm text-white flex items-center gap-2 transform transition-all duration-300 translate-y-full opacity-0 ${type === 'success' ? 'bg-gray-800' : 'bg-blue-600'}`;
-            
-            const icon = type === 'success' ? 'ph-check-circle' : 'ph-info';
-            
-            toast.innerHTML = `
-                <i class="ph-fill ${icon} text-lg"></i>
-                <span>${message}</span>
-            `;
-            
-            container.appendChild(toast);
-            
-            // Trigger animation
-            requestAnimationFrame(() => {
-                toast.classList.remove('translate-y-full', 'opacity-0');
-            });
-            
-            // Remove toast after 3 seconds
-            setTimeout(() => {
-                toast.classList.add('translate-y-full', 'opacity-0');
-                setTimeout(() => {
-                    toast.remove();
-                }, 300);
-            }, 3000);
+    function applyClamp(targets) {
+      targets.forEach(({ id, textEl, moreBtn }) => {
+        if (!textEl.isConnected) return;
+        const isExpanded = expanded.has(id);
+        // 넘침 여부는 항상 '접힌 상태'에서 재본다
+        if (isExpanded) textEl.classList.add("clamped");
+        const overflows = textEl.scrollHeight > textEl.clientHeight + 1;
+        if (!overflows) {
+          expanded.delete(id);
+          moreBtn.classList.add("hidden");
+          return;
         }
-        
-        // Download Simulation Function
-        function triggerDownload(event) {
-            event.preventDefault();
-            showToast('탐구활동 워크북 다운로드가 시작되었습니다.', 'success');
-            
-            // Create a dummy text file to simulate actual download behavior
-            const text = "에너지 보존 법칙 탐구활동 워크북 내용입니다.\n\n본 파일은 모의 다운로드 테스트를 위해 생성된 임시 텍스트 파일입니다.";
-            const blob = new Blob([text], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = '탐구활동_워크북_모의.txt';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+        moreBtn.classList.remove("hidden");
+        if (isExpanded) {
+          textEl.classList.remove("clamped");
+          moreBtn.textContent = "접기";
+        } else {
+          moreBtn.textContent = "자세히";
         }
-        
-        // ==========================================
-        // NEW STATE & VARIABLES
-        // ==========================================
-        let currentAnalysisData = null;
-        let submittedAssignments = [];
-        let energyChartInstance = null;
-        const DASHBOARD_PWD = '1234';
+      });
+    }
 
-        // Firebase 연동을 위해 실시간 상태를 업데이트 해주는 전역 함수
-        window.updateAssignmentsState = function(data) {
-            submittedAssignments = data;
-            renderDashboardTable();
-        };
+    // ---- Live sync ----
+    if (configured) {
+      onValue(messagesRef, (snap) => {
+        const val = snap.val() || {};
+        messages = Object.entries(val).map(([id, v]) => ({
+          id,
+          text: v.text || "",
+          createdAt: v.createdAt || 0,
+          hidden: !!v.hidden,
+          order: (v.order !== undefined && v.order !== null) ? v.order : (v.createdAt || 0),
+          updatedAt: (v.updatedAt !== undefined && v.updatedAt !== null) ? v.updatedAt : (v.createdAt || 0)
+        }));
+        render();
+      });
+      onValue(profileRef, (snap) => {
+        const v = snap.val() || {};
+        profile = { name: v.name || "", affiliation: v.affiliation || "", contact: v.contact || "" };
+        renderProfile();
+        if (mode === "teacher") fillProfileInputs();
+      });
+    }
 
-        // ==========================================
-        // TAB 2: EXCEL GENERATION
-        // ==========================================
-        function downloadExampleExcel() {
-            showToast('예시 실험 데이터(.xlsx) 생성 및 다운로드 중...', 'info');
-            
-            // Create mock physics data (Free fall example, mass 1kg, 10m height)
-            const data = [];
-            const g = 9.8;
-            const h0 = 10; 
-            for(let t = 0; t <= 1.4; t += 0.2) {
-                let h = h0 - 0.5 * g * Math.pow(t, 2);
-                let v = g * t;
-                if(h < 0) { h = 0; v = Math.sqrt(2 * g * h0); } // Stop at ground
-                data.push({
-                    "시간(s)": Number(t.toFixed(2)),
-                    "높이(m)": Number(h.toFixed(2)),
-                    "속도(m/s)": Number(v.toFixed(2))
-                });
-            }
-
-            // Generate Excel using SheetJS
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "실험데이터");
-            XLSX.writeFile(wb, "example_data.xlsx");
-            
-            setTimeout(() => showToast('예시 파일 다운로드 완료!', 'success'), 500);
-        }
-
-        // ==========================================
-        // TAB 3: EXCEL UPLOAD & ANALYSIS
-        // ==========================================
-        function handleExcelUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            showToast('데이터 분석 중...', 'info');
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, {type: 'array'});
-                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-                    
-                    processPhysicsData(jsonData, file.name);
-                } catch (error) {
-                    showToast('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 확인해주세요.', 'error');
-                    console.error(error);
-                }
-            };
-            
-            reader.readAsArrayBuffer(file);
-        }
-
-        function processPhysicsData(data, filename) {
-            const mass = 1; // 1kg for simplicity
-            const g = 9.8;
-            const processed = [];
-            const labels = [];
-            const peData = [];
-            const keData = [];
-            const teData = [];
-
-            // Calculate Energies
-            data.forEach((row) => {
-                const keys = Object.keys(row);
-                // Try to find correct columns, fallback to index
-                let t = row['시간(s)'] ?? row[keys[0]] ?? 0;
-                let h = row['높이(m)'] ?? row[keys[1]] ?? 0;
-                let v = row['속도(m/s)'] ?? row[keys[2]] ?? 0;
-
-                t = Number(t); h = Number(h); v = Number(v);
-
-                const pe = mass * g * h;
-                const ke = 0.5 * mass * Math.pow(v, 2);
-                const te = pe + ke;
-
-                processed.push({ t, h, v, pe, ke, te });
-                labels.push(t.toFixed(2) + 's');
-                peData.push(pe);
-                keData.push(ke);
-                teData.push(te);
-            });
-
-            currentAnalysisData = {
-                filename: filename,
-                data: processed
-            };
-
-            updateAnalysisUI(processed, labels, peData, keData, teData);
-            updateAssignmentLinkUI(filename);
-            showToast('데이터 분석 및 그래프 생성이 완료되었습니다.', 'success');
-        }
-
-        function updateAnalysisUI(data, labels, peData, keData, teData) {
-            document.getElementById('analysis-results').classList.remove('hidden');
-
-            // Render Table (Max 5 rows for preview)
-            const tbody = document.getElementById('analysis-table-body');
-            tbody.innerHTML = '';
-            data.slice(0, 5).forEach(row => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="border p-2">${row.t.toFixed(2)}</td>
-                    <td class="border p-2">${row.h.toFixed(2)}</td>
-                    <td class="border p-2">${row.v.toFixed(2)}</td>
-                    <td class="border p-2 font-medium text-blue-600">${row.pe.toFixed(2)}</td>
-                    <td class="border p-2 font-medium text-red-600">${row.ke.toFixed(2)}</td>
-                    <td class="border p-2 font-medium text-purple-600 bg-purple-50">${row.te.toFixed(2)}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-            
-            if (data.length > 5) {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td colspan="6" class="border p-2 text-gray-400 text-xs">... 외 ${data.length - 5}개 데이터 행 생략 ...</td>`;
-                tbody.appendChild(tr);
-            }
-
-            // Render Chart
-            const ctx = document.getElementById('energyChart').getContext('2d');
-            if (energyChartInstance) {
-                energyChartInstance.destroy();
-            }
-
-            energyChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: '위치 에너지 (PE)', data: peData, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.3 },
-                        { label: '운동 에너지 (KE)', data: keData, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.3 },
-                        { label: '총 역학적 에너지 (TE)', data: teData, borderColor: '#8b5cf6', backgroundColor: '#8b5cf6', tension: 0.3, borderDash: [5, 5], borderWidth: 3 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { title: { display: true, text: '시간 (s)' } },
-                        y: { title: { display: true, text: '에너지 (J)' }, beginAtZero: true }
-                    },
-                    plugins: {
-                        tooltip: { mode: 'index', intersect: false }
-                    }
-                }
-            });
-        }
-
-        // ==========================================
-        // ASSIGNMENT & DASHBOARD LINKING
-        // ==========================================
-        function updateAssignmentLinkUI(filename) {
-            const statusDiv = document.getElementById('attached-data-status');
-            statusDiv.className = "p-3 bg-blue-50 border border-blue-200 rounded-md flex items-center justify-between text-sm text-blue-700 transition-all";
-            statusDiv.innerHTML = `
-                <div class="flex items-center gap-2">
-                    <i class="ph-fill ph-check-circle text-lg text-blue-600"></i>
-                    <span><span class="font-bold">분석 완료 데이터 첨부됨:</span> ${filename}</span>
-                </div>
-                <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded font-semibold">자동 연동 완료</span>
-            `;
-        }
-
-        // Form Submission Logic
-        async function submitForm(event) {
-            event.preventDefault();
-            
-            const groupName = document.getElementById('group-name').value;
-            const note = document.getElementById('submission-note').value;
-            const now = new Date();
-            
-            const submission = {
-                date: now.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                group: groupName,
-                hasData: !!currentAnalysisData,
-                filename: currentAnalysisData ? currentAnalysisData.filename : '미첨부',
-                note: note || '-'
-            };
-            
-            try {
-                // Firebase DB 저장 모듈이 활성화되었을 경우 서버로 전송
-                if (window.saveSubmissionToDB) {
-                    const submitBtn = event.target.querySelector('button[type="submit"]');
-                    const originalText = submitBtn.innerText;
-                    submitBtn.innerText = "서버로 제출 중...";
-                    submitBtn.disabled = true;
-                    
-                    await window.saveSubmissionToDB(submission);
-                    showToast('과제가 서버에 성공적으로 제출 및 동기화되었습니다.', 'success');
-                    
-                    submitBtn.innerText = originalText;
-                    submitBtn.disabled = false;
-                } else {
-                    // Firebase 연동 전 대비 (로컬 폴백)
-                    submittedAssignments.push(submission);
-                    renderDashboardTable();
-                    showToast('과제가 로컬에 임시 저장되었습니다.', 'success');
-                }
-            } catch (error) {
-                showToast('제출 중 오류가 발생했습니다: ' + error.message, 'error');
-                console.error(error);
-                return; // 에러 시 입력 폼 초기화 중단
-            }
-            
-            event.target.reset(); // Clear form inputs
-            currentAnalysisData = null; // Reset analysis state
-            
-            // Reset UI
-            const statusDiv = document.getElementById('attached-data-status');
-            statusDiv.className = "p-3 bg-gray-50 border border-gray-200 rounded-md flex items-center gap-2 text-sm text-gray-500 transition-all";
-            statusDiv.innerHTML = `<i class="ph ph-link-break text-lg"></i><span>아직 탐구 안내(3단계)에서 분석된 데이터가 없습니다.</span>`;
-        }
-
-        // ==========================================
-        // TEACHER DASHBOARD LOGIC
-        // ==========================================
-        function checkDashboardAuth() {
-            const pwd = document.getElementById('dashboard-pwd').value;
-            if (pwd === DASHBOARD_PWD) {
-                document.getElementById('dashboard-login').classList.add('hidden');
-                document.getElementById('dashboard-content').classList.remove('hidden');
-                document.getElementById('dashboard-pwd').value = '';
-                showToast('대시보드 관리자 모드로 접속했습니다.', 'success');
-            } else {
-                showToast('비밀번호가 일치하지 않습니다.', 'error');
-            }
-        }
-
-        function renderDashboardTable() {
-            const tbody = document.getElementById('dashboard-table-body');
-            const countSpan = document.getElementById('submission-count');
-            
-            countSpan.innerText = submittedAssignments.length;
-            
-            if (submittedAssignments.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">아직 제출된 과제가 없습니다.</td></tr>`;
-                return;
-            }
-            
-            tbody.innerHTML = '';
-            // Render in reverse order (newest first)
-            [...submittedAssignments].reverse().forEach(sub => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-50 transition-colors";
-                const dataBadge = sub.hasData 
-                    ? `<span class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold border border-green-200"><i class="ph-fill ph-chart-line-up"></i>${sub.filename}</span>`
-                    : `<span class="text-gray-400 text-xs bg-gray-100 px-2 py-1 rounded border border-gray-200">미첨부</span>`;
-                    
-                tr.innerHTML = `
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${sub.date}</td>
-                    <td class="px-4 py-3 font-semibold text-gray-800">${sub.group}</td>
-                    <td class="px-4 py-3">${dataBadge}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600 break-words max-w-xs">${sub.note}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-    </script>
+    // ---- Init: honor #teacher (still requires password) ----
+    if (location.hash.replace("#", "") === "teacher") {
+      enterTeacher();
+    }
+    applyMode();
+  </script>
 </body>
 </html>
