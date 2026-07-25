@@ -118,8 +118,12 @@
       border-color: var(--bubble-hidden-border);
       opacity: 0.55;
     }
+    /* 수강생 화면: 버블 전체가 복사 버튼 역할 */
+    .bubble.copyable { cursor: pointer; }
+    .bubble.copyable:hover { border-color: var(--accent); }
+    .bubble.copyable:active { opacity: 0.85; }
+    .bubble .content { flex: 1; min-width: 0; }
     .bubble .text {
-      flex: 1;
       white-space: pre-wrap;
       word-break: break-word;
       font-size: 1.5rem;
@@ -127,6 +131,25 @@
       user-select: text;
       -webkit-user-select: text;
     }
+    /* 3줄 초과 시 ... 처리 */
+    .bubble .text.clamped {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .bubble .btn-more {
+      margin-top: 8px;
+      padding: 4px 10px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: transparent;
+      border: 1px solid var(--bubble-border);
+      border-radius: 999px;
+    }
+    .bubble .btn-more:hover { background: #dbe9fd; }
     .bubble .num {
       flex-shrink: 0;
       min-width: 1.5em;
@@ -250,9 +273,62 @@
     }
     .profile-footer .pf-copy { margin-top: 6px; font-size: 0.72rem; opacity: 0.9; }
 
+    /* Copy modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 100;
+    }
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      padding: 26px 30px 20px;
+      min-width: 240px;
+      max-width: 320px;
+      text-align: center;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
+      animation: modal-in 0.16s ease-out;
+    }
+    @keyframes modal-in {
+      from { transform: scale(0.94); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .modal .modal-icon {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 1.4rem;
+      line-height: 44px;
+      font-weight: 700;
+    }
+    .modal .modal-msg { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+    .modal .modal-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .modal .modal-ok { min-width: 90px; }
+
     @media (max-width: 560px) {
       .bubble { flex-direction: row; flex-wrap: wrap; }
-      .bubble .text { flex-basis: 100%; order: 2; font-size: 1.3rem; }
+      .bubble .content { flex-basis: 100%; order: 2; }
+      .bubble .text { font-size: 1.3rem; }
       .bubble .num { order: 1; }
       .bubble .time { order: 3; padding-top: 0; }
       .bubble .actions { order: 4; flex-direction: row; flex-wrap: wrap; }
@@ -310,6 +386,16 @@
     <footer id="profileCard" class="profile-footer hidden"></footer>
   </div>
 
+  <!-- 복사 완료 모달 -->
+  <div id="copyModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="copyModalMsg">
+    <div class="modal">
+      <div class="modal-icon" aria-hidden="true">✓</div>
+      <div id="copyModalMsg" class="modal-msg">복사되었습니다</div>
+      <div id="copyModalSub" class="modal-sub"></div>
+      <button id="copyModalOk" class="btn-primary modal-ok" type="button">확인</button>
+    </div>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
@@ -347,6 +433,8 @@
     let messages = [];            // [{id, text, createdAt, hidden}]
     let mode = "student";         // 'student' | 'teacher'
     let editingId = null;
+    const expanded = new Set();   // 3줄 클램프를 펼쳐둔 메시지 id
+    let renderToken = 0;          // 겹친 렌더의 지연 측정 무효화용
     let profile = { name: "", affiliation: "", contact: "" };
 
     // ---- Elements ----
@@ -510,8 +598,30 @@
       pfToggleEl.setAttribute("aria-expanded", String(!collapsed));
     });
 
-    // ---- Clipboard ----
-    async function copyText(text, btn) {
+    // ---- Clipboard + 복사 완료 모달 ----
+    const copyModalEl = document.getElementById("copyModal");
+    const copyModalSubEl = document.getElementById("copyModalSub");
+    let copyModalTimer = null;
+
+    function showCopyModal(text) {
+      copyModalSubEl.textContent = text;
+      copyModalEl.classList.remove("hidden");
+      clearTimeout(copyModalTimer);
+      copyModalTimer = setTimeout(hideCopyModal, 1400);
+    }
+    function hideCopyModal() {
+      clearTimeout(copyModalTimer);
+      copyModalEl.classList.add("hidden");
+    }
+    document.getElementById("copyModalOk").addEventListener("click", hideCopyModal);
+    copyModalEl.addEventListener("click", (e) => {
+      if (e.target === copyModalEl) hideCopyModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hideCopyModal();
+    });
+
+    async function copyText(text) {
       try {
         await navigator.clipboard.writeText(text);
       } catch {
@@ -520,10 +630,7 @@
         try { document.execCommand("copy"); } catch {}
         document.body.removeChild(ta);
       }
-      const original = btn.textContent;
-      btn.textContent = "복사됨";
-      btn.disabled = true;
-      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1000);
+      showCopyModal(text);
     }
 
     // ---- Time formatting ----
@@ -565,6 +672,8 @@
       listEl.innerHTML = "";
       emptyEl.classList.toggle("hidden", visible.length > 0);
 
+      const clampTargets = [];   // [{id, textEl, moreBtn}] — 렌더 후 넘침 여부 측정
+
       visible.forEach((m, idx) => {
         const bubble = document.createElement("div");
         bubble.className = "bubble" + (m.hidden ? " is-hidden" : "");
@@ -599,9 +708,28 @@
           return;
         }
 
+        // 본문 + 자세히 버튼 (3줄 초과 시에만 버튼 노출)
+        const contentEl = document.createElement("div");
+        contentEl.className = "content";
+
         const textEl = document.createElement("div");
-        textEl.className = "text";
+        textEl.className = "text clamped";
         textEl.textContent = m.text;
+
+        const moreBtn = document.createElement("button");
+        moreBtn.type = "button";
+        moreBtn.className = "btn-more hidden";
+        moreBtn.textContent = "자세히";
+        moreBtn.addEventListener("click", (e) => {
+          e.stopPropagation();   // 버블 클릭(복사)과 분리
+          const isExpanded = expanded.has(m.id);
+          if (isExpanded) expanded.delete(m.id); else expanded.add(m.id);
+          textEl.classList.toggle("clamped", isExpanded);
+          moreBtn.textContent = isExpanded ? "자세히" : "접기";
+        });
+
+        contentEl.append(textEl, moreBtn);
+        clampTargets.push({ id: m.id, textEl, moreBtn });
 
         // 버튼 왼쪽 작은 시간 표기 (강의자=절대시간, 수강생=상대시간)
         const timeEl = document.createElement("div");
@@ -648,17 +776,55 @@
           downBtn.addEventListener("click", () => moveMessage(m.id, 1));
           reorder.append(upBtn, downBtn);
 
-          bubble.append(numEl, textEl, timeEl, actions, reorder);
+          bubble.append(numEl, contentEl, timeEl, actions, reorder);
         } else {
-          const copyBtn = document.createElement("button");
-          copyBtn.textContent = "복사";
-          copyBtn.addEventListener("click", () => copyText(m.text, copyBtn));
-          actions.append(copyBtn);
+          // 복사 버튼 없음 — 버블 자체를 클릭하면 복사
+          bubble.classList.add("copyable");
+          bubble.title = "클릭하면 복사됩니다";
+          bubble.addEventListener("click", () => {
+            // 텍스트를 직접 선택(드래그)한 경우엔 복사 동작을 건너뜀
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && bubble.contains(sel.anchorNode)) return;
+            copyText(m.text);
+          });
 
-          bubble.append(numEl, textEl, timeEl, actions);
+          bubble.append(numEl, contentEl, timeEl);
         }
 
         listEl.appendChild(bubble);
+      });
+
+      // 붙인 직후 동기 측정 — 3줄을 넘칠 때만 '자세히' 노출, 펼쳐둔 항목은 상태 복원.
+      // (rAF를 쓰면 탭이 백그라운드일 때 프레임이 안 와서 버튼이 안 나타남)
+      applyClamp(clampTargets);
+      // 웹폰트가 늦게 적용되면 줄 수가 달라질 수 있어 한 번 더 측정
+      const token = ++renderToken;
+      if (document.fonts && document.fonts.status !== "loaded") {
+        document.fonts.ready.then(() => {
+          if (token === renderToken) applyClamp(clampTargets);
+        });
+      }
+    }
+
+    function applyClamp(targets) {
+      targets.forEach(({ id, textEl, moreBtn }) => {
+        if (!textEl.isConnected) return;
+        const isExpanded = expanded.has(id);
+        // 넘침 여부는 항상 '접힌 상태'에서 재본다
+        if (isExpanded) textEl.classList.add("clamped");
+        const overflows = textEl.scrollHeight > textEl.clientHeight + 1;
+        if (!overflows) {
+          expanded.delete(id);
+          moreBtn.classList.add("hidden");
+          return;
+        }
+        moreBtn.classList.remove("hidden");
+        if (isExpanded) {
+          textEl.classList.remove("clamped");
+          moreBtn.textContent = "접기";
+        } else {
+          moreBtn.textContent = "자세히";
+        }
       });
     }
 
