@@ -83,6 +83,50 @@
     .banner code { background: #fff2c2; padding: 1px 5px; border-radius: 4px; }
     .hidden { display: none !important; }
 
+    /* 수업 종류 바 */
+    .classbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .classbar .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip {
+      padding: 6px 13px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: var(--fg);
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .chip:hover { background: #e2e8f0; }
+    .chip.active { background: var(--accent); color: var(--accent-fg); }
+    .chip.active:hover { background: #1d4ed8; }
+    .classbar .cb-tools { display: flex; gap: 4px; margin-left: auto; }
+    .classbar .cb-tools button {
+      padding: 6px 10px;
+      font-size: 0.82rem;
+      background: transparent;
+      color: var(--muted);
+    }
+    .classbar .cb-tools button:hover { background: #f0f0f0; }
+    .classbar .cb-add { color: var(--accent); font-weight: 700; }
+    .class-label { font-size: 0.92rem; color: var(--muted); }
+    .class-label b { color: var(--accent); font-weight: 700; }
+
+    select {
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--fg);
+    }
+    select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
     /* Composer (teacher) */
     .composer { margin-bottom: 22px; }
     .composer textarea {
@@ -99,7 +143,16 @@
       color: var(--fg);
     }
     .composer textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
-    .composer-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+    .composer .cat-row { display: flex; align-items: center; gap: 8px; }
+    .composer .cat-row label { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+    .composer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
     .bulk-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 
     /* Bubbles */
@@ -150,6 +203,18 @@
       border-radius: 999px;
     }
     .bubble .btn-more:hover { background: #dbe9fd; }
+    .bubble .cat-tag {
+      display: inline-block;
+      margin-top: 9px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: #dbe9fd;
+      border-radius: 999px;
+      padding: 3px 10px;
+    }
+    .bubble .cat-select { margin-top: 9px; font-size: 0.8rem; padding: 4px 8px; }
+    .bubble .content-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .bubble .num {
       flex-shrink: 0;
       min-width: 1.5em;
@@ -348,10 +413,17 @@
       본인 프로젝트 값으로 교체하세요. 방법은 <code>README.md</code> 참고.
     </div>
 
+    <!-- 수업 종류 선택 바 (강의자: 선택·추가·수정, 수강생: 현재 수업 표시) -->
+    <div id="classBar" class="classbar hidden"></div>
+
     <!-- 강의자 전용 작성 영역 -->
     <div id="teacherComposer" class="composer hidden">
       <textarea id="input" placeholder="여기에 글을 적고 저장하세요 (여러 줄 가능)"></textarea>
       <div class="composer-row">
+        <div class="cat-row">
+          <label for="msgCategory">수업 종류</label>
+          <select id="msgCategory"></select>
+        </div>
         <button id="saveBtn" class="btn-primary">저장</button>
       </div>
       <div class="bulk-row">
@@ -417,20 +489,26 @@
     const TEACHER_PASSWORD = "4496";
     const DB_PATH = "rooms/default/messages";
     const PROFILE_PATH = "rooms/default/profile";
+    const CATEGORIES_PATH = "rooms/default/categories";
+    const STATE_PATH = "rooms/default/state";
 
     const configured = firebaseConfig.apiKey !== "YOUR_API_KEY";
-    let db = null, messagesRef = null, profileRef = null;
+    let db = null, messagesRef = null, profileRef = null, categoriesRef = null, stateRef = null;
     if (configured) {
       const app = initializeApp(firebaseConfig);
       db = getDatabase(app);
       messagesRef = ref(db, DB_PATH);
       profileRef = ref(db, PROFILE_PATH);
+      categoriesRef = ref(db, CATEGORIES_PATH);
+      stateRef = ref(db, STATE_PATH);
     } else {
       document.getElementById("setupBanner").classList.remove("hidden");
     }
 
     // ---- State ----
-    let messages = [];            // [{id, text, createdAt, hidden}]
+    let messages = [];            // [{id, text, createdAt, hidden, categoryId}]
+    let categories = [];          // [{id, name, createdAt, order}]
+    let activeCategory = "";      // "" = 전체 보기 (강의자·수강생 화면 공통, DB로 동기화)
     let mode = "student";         // 'student' | 'teacher'
     let editingId = null;
     const expanded = new Set();   // 3줄 클램프를 펼쳐둔 메시지 id
@@ -444,6 +522,8 @@
     const modeToggle = document.getElementById("modeToggle");
     const titleEl = document.getElementById("title");
     const inputEl = document.getElementById("input");
+    const classBarEl = document.getElementById("classBar");
+    const msgCategoryEl = document.getElementById("msgCategory");
     const profileEditorEl = document.getElementById("profileEditor");
     const profileCardEl = document.getElementById("profileCard");
     const pfNameEl = document.getElementById("pfName");
@@ -474,10 +554,139 @@
       profileEditorEl.classList.toggle("hidden", !teacher);
       modeToggle.textContent = teacher ? "수강생 화면으로" : "강의자 모드";
       titleEl.textContent = teacher ? "강의 보드 · 강의자" : "강의 보드";
-      if (teacher) fillProfileInputs();
+      if (teacher) { fillProfileInputs(); syncComposerCategory(); }
+      renderClassBar();
       render();
     }
     modeToggle.addEventListener("click", () => (mode === "teacher" ? exitTeacher() : enterTeacher()));
+
+    // ---- 수업 종류 (categories) ----
+    function sortCategories(arr) {
+      return [...arr].sort((a, b) =>
+        (a.order - b.order) || (a.createdAt - b.createdAt) || (a.id < b.id ? -1 : 1)
+      );
+    }
+    function categoryName(id) {
+      const c = categories.find(x => x.id === id);
+      return c ? c.name : "";
+    }
+    function addCategory() {
+      if (!configured) return alert("Firebase 설정이 필요합니다. README.md를 확인하세요.");
+      const name = (window.prompt("추가할 수업 종류의 이름을 입력하세요") || "").trim();
+      if (!name) return;
+      if (categories.some(c => c.name === name)) return alert("같은 이름의 수업 종류가 이미 있습니다.");
+      const now = Date.now();
+      const created = push(categoriesRef, { name, createdAt: now, order: now });
+      setActiveCategory(created.key);   // 새로 만든 수업을 바로 선택
+    }
+    function renameCategory(id) {
+      const c = categories.find(x => x.id === id);
+      if (!c) return;
+      const name = (window.prompt("수업 종류 이름을 수정하세요", c.name) || "").trim();
+      if (!name || name === c.name) return;
+      if (categories.some(x => x.id !== id && x.name === name)) return alert("같은 이름의 수업 종류가 이미 있습니다.");
+      update(ref(db, `${CATEGORIES_PATH}/${id}`), { name });
+    }
+    function deleteCategory(id) {
+      const c = categories.find(x => x.id === id);
+      if (!c) return;
+      const affected = messages.filter(m => m.categoryId === id);
+      const msg = affected.length
+        ? `'${c.name}' 수업 종류를 삭제할까요?\n이 수업의 글 ${affected.length}개는 삭제되지 않고 '미분류'로 이동합니다.`
+        : `'${c.name}' 수업 종류를 삭제할까요?`;
+      if (!confirm(msg)) return;
+      if (affected.length) {
+        const updates = {};
+        affected.forEach(m => { updates[`${m.id}/categoryId`] = ""; });
+        update(messagesRef, updates);
+      }
+      remove(ref(db, `${CATEGORIES_PATH}/${id}`));
+      setActiveCategory("");
+    }
+    // 선택된 수업은 DB에 저장 → 수강생 화면도 같은 수업만 보게 됨
+    function setActiveCategory(id) {
+      if (!configured) return;
+      update(stateRef, { activeCategory: id || "" });
+    }
+    // 강의자 화면의 수업 종류 바 / 수강생 화면의 현재 수업 표시
+    function renderClassBar() {
+      const teacher = mode === "teacher";
+      classBarEl.innerHTML = "";
+
+      if (!teacher) {
+        const name = categoryName(activeCategory);
+        classBarEl.classList.toggle("hidden", !name);
+        if (!name) return;
+        const label = document.createElement("div");
+        label.className = "class-label";
+        const strong = document.createElement("b");
+        strong.textContent = name;
+        label.append("현재 수업: ", strong);
+        classBarEl.appendChild(label);
+        return;
+      }
+
+      classBarEl.classList.remove("hidden");
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      const makeChip = (id, name) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "chip" + (activeCategory === id ? " active" : "");
+        b.textContent = name;
+        b.addEventListener("click", () => setActiveCategory(id));
+        return b;
+      };
+      chips.appendChild(makeChip("", "전체"));
+      sortCategories(categories).forEach(c => chips.appendChild(makeChip(c.id, c.name)));
+      classBarEl.appendChild(chips);
+
+      const tools = document.createElement("div");
+      tools.className = "cb-tools";
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "cb-add";
+      addBtn.textContent = "+ 수업 추가";
+      addBtn.addEventListener("click", addCategory);
+      tools.appendChild(addBtn);
+      if (activeCategory && categoryName(activeCategory)) {
+        const renBtn = document.createElement("button");
+        renBtn.type = "button";
+        renBtn.textContent = "이름 변경";
+        renBtn.addEventListener("click", () => renameCategory(activeCategory));
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "btn-danger";
+        delBtn.textContent = "수업 삭제";
+        delBtn.addEventListener("click", () => deleteCategory(activeCategory));
+        tools.append(renBtn, delBtn);
+      }
+      classBarEl.appendChild(tools);
+    }
+    // select 요소에 '미분류' + 수업 종류 목록 채우기
+    function fillCategorySelect(sel, value) {
+      sel.innerHTML = "";
+      const none = document.createElement("option");
+      none.value = "";
+      none.textContent = "미분류";
+      sel.appendChild(none);
+      sortCategories(categories).forEach(c => {
+        const o = document.createElement("option");
+        o.value = c.id;
+        o.textContent = c.name;
+        sel.appendChild(o);
+      });
+      sel.value = categories.some(c => c.id === value) ? value : "";
+    }
+    // 작성창의 수업 선택: 선택된 수업이 바뀌면 그 수업으로 따라가고, 그 외엔 강의자 선택을 유지
+    let composerSyncedTo = null;
+    function syncComposerCategory() {
+      // 선택된 수업이 아직 목록에 안 들어온 상태(초기 로딩)에서는 동기화를 미룬다
+      const known = !activeCategory || categories.some(c => c.id === activeCategory);
+      const follow = known && composerSyncedTo !== activeCategory;
+      if (known) composerSyncedTo = activeCategory;
+      fillCategorySelect(msgCategoryEl, follow ? activeCategory : msgCategoryEl.value);
+    }
 
     // ---- Data ops ----
     function saveMessage() {
@@ -485,9 +694,13 @@
       const text = inputEl.value.trim();
       if (!text) return;
       const now = Date.now();
-      push(messagesRef, { text, createdAt: now, updatedAt: now, hidden: false, order: now });
+      const categoryId = msgCategoryEl.value || "";
+      push(messagesRef, { text, createdAt: now, updatedAt: now, hidden: false, order: now, categoryId });
       inputEl.value = "";
       inputEl.focus();
+    }
+    function setMessageCategory(id, categoryId) {
+      update(ref(db, `${DB_PATH}/${id}`), { categoryId: categoryId || "" });
     }
     function updateText(id, text) {
       update(ref(db, `${DB_PATH}/${id}`), { text, updatedAt: Date.now() });
@@ -499,19 +712,30 @@
       if (!confirm("이 글을 삭제할까요?")) return;
       remove(ref(db, `${DB_PATH}/${id}`));
     }
+    // 일괄 숨기기/보이기는 지금 선택된 수업의 글에만 적용
     function setAllHidden(hidden) {
-      if (!messages.length) return;
+      const targets = messages.filter(matchesActiveCategory);
+      if (!targets.length) return;
       const updates = {};
-      messages.forEach(m => { updates[`${m.id}/hidden`] = hidden; });
+      targets.forEach(m => { updates[`${m.id}/hidden`] = hidden; });
       update(messagesRef, updates);
+    }
+    // activeCategory가 ""(전체)면 모두 통과, 아니면 해당 수업의 글만
+    function matchesActiveCategory(m) {
+      return !activeCategory || m.categoryId === activeCategory;
+    }
+    // 현재 화면에 실제로 보이는 목록 (모드 + 선택된 수업 기준, 정렬 완료)
+    function visibleMessages() {
+      const teacher = mode === "teacher";
+      return sortMessages(messages.filter(m => (teacher || !m.hidden) && matchesActiveCategory(m)));
     }
     // 정렬 기준값(order 없으면 createdAt로 대체)
     function effOrder(m) {
       return (m.order !== undefined && m.order !== null) ? m.order : m.createdAt;
     }
-    // dir: -1 = 위로, +1 = 아래로 (강의자 전체 목록 기준으로 이웃과 order 교환)
+    // dir: -1 = 위로, +1 = 아래로 (현재 보이는 목록 기준으로 이웃과 order 교환)
     function moveMessage(id, dir) {
-      const sorted = sortMessages(messages);
+      const sorted = visibleMessages();
       const i = sorted.findIndex(m => m.id === id);
       const j = i + dir;
       if (i < 0 || j < 0 || j >= sorted.length) return;
@@ -665,12 +889,16 @@
     // ---- Render ----
     function render() {
       const teacher = mode === "teacher";
-      // 수강생: 숨김 제외. 강의자: 전부. 둘 다 최신 위.
       // 수강생: 숨김 제외. 강의자: 전부. order 기준 상단 우선.
-      const visible = sortMessages(messages.filter(m => teacher || !m.hidden));
+      // 선택된 수업 종류가 있으면 양쪽 모두 그 수업의 글만.
+      const visible = visibleMessages();
 
       listEl.innerHTML = "";
       emptyEl.classList.toggle("hidden", visible.length > 0);
+      const activeName = categoryName(activeCategory);
+      emptyEl.textContent = activeName
+        ? `'${activeName}' 수업에 표시된 글이 없습니다.`
+        : "아직 표시된 글이 없습니다.";
 
       const clampTargets = [];   // [{id, textEl, moreBtn}] — 렌더 후 넘침 여부 측정
 
@@ -730,6 +958,24 @@
 
         contentEl.append(textEl, moreBtn);
         clampTargets.push({ id: m.id, textEl, moreBtn });
+
+        // 수업 종류: 강의자는 셀렉트로 변경, 수강생은 '전체' 상태일 때만 배지로 표시
+        const foot = document.createElement("div");
+        foot.className = "content-foot";
+        if (teacher) {
+          const catSel = document.createElement("select");
+          catSel.className = "cat-select";
+          fillCategorySelect(catSel, m.categoryId);
+          catSel.addEventListener("click", (e) => e.stopPropagation());
+          catSel.addEventListener("change", () => setMessageCategory(m.id, catSel.value));
+          foot.appendChild(catSel);
+        } else if (!activeCategory && categoryName(m.categoryId)) {
+          const tag = document.createElement("span");
+          tag.className = "cat-tag";
+          tag.textContent = categoryName(m.categoryId);
+          foot.appendChild(tag);
+        }
+        if (foot.childElementCount) contentEl.appendChild(foot);
 
         // 버튼 왼쪽 작은 시간 표기 (강의자=절대시간, 수강생=상대시간)
         const timeEl = document.createElement("div");
@@ -838,8 +1084,28 @@
           createdAt: v.createdAt || 0,
           hidden: !!v.hidden,
           order: (v.order !== undefined && v.order !== null) ? v.order : (v.createdAt || 0),
-          updatedAt: (v.updatedAt !== undefined && v.updatedAt !== null) ? v.updatedAt : (v.createdAt || 0)
+          updatedAt: (v.updatedAt !== undefined && v.updatedAt !== null) ? v.updatedAt : (v.createdAt || 0),
+          categoryId: v.categoryId || ""
         }));
+        render();
+      });
+      onValue(categoriesRef, (snap) => {
+        const val = snap.val() || {};
+        categories = Object.entries(val).map(([id, v]) => ({
+          id,
+          name: v.name || "",
+          createdAt: v.createdAt || 0,
+          order: (v.order !== undefined && v.order !== null) ? v.order : (v.createdAt || 0)
+        }));
+        if (mode === "teacher") syncComposerCategory();
+        renderClassBar();
+        render();
+      });
+      onValue(stateRef, (snap) => {
+        const v = snap.val() || {};
+        activeCategory = v.activeCategory || "";
+        if (mode === "teacher") syncComposerCategory();
+        renderClassBar();
         render();
       });
       onValue(profileRef, (snap) => {
