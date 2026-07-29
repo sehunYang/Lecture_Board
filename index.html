@@ -527,6 +527,39 @@
     }
     .profile-footer .pf-copy { margin-top: 6px; font-size: 0.72rem; opacity: 0.9; }
 
+    /* 강의자 비밀번호 다이얼로그 */
+    .pw-dialog {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      color: var(--text);
+      padding: 1.5rem 1.6rem 1.3rem;
+      min-width: min(21rem, calc(100vw - 2.5rem));
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+    }
+    .pw-dialog::backdrop { background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(3px); }
+    .pw-title { font-size: 1.15rem; font-weight: 800; margin: 0 0 1rem; }
+    .pw-label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
+    .pw-input {
+      width: 100%;
+      font-family: inherit;
+      font-size: 1.3rem;
+      letter-spacing: 0.25em;
+      padding: 0.6rem 0.8rem;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .pw-error {
+      min-height: 1.3rem;
+      margin: 0.45rem 0 0;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--danger);
+    }
+    .pw-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.6rem; }
+
     /* Toast 내부 (복사 완료 알림) */
     .toast .toast-msg { display: block; font-size: 0.95rem; }
     .toast .toast-preview {
@@ -623,6 +656,21 @@
     <span id="toastPreview" class="toast-preview" aria-hidden="true"></span>
   </div>
 
+  <!-- 강의자 비밀번호 입력 (화면 공유 중 노출 방지를 위해 type=password 사용) -->
+  <dialog id="pwDialog" class="pw-dialog" aria-labelledby="pwTitle">
+    <form id="pwForm" method="dialog">
+      <h2 id="pwTitle" class="pw-title">강의자 모드</h2>
+      <label class="pw-label" for="pwInput">비밀번호</label>
+      <input id="pwInput" class="pw-input" type="password" inputmode="numeric"
+             autocomplete="current-password" placeholder="••••" />
+      <p id="pwError" class="pw-error" role="alert"></p>
+      <div class="pw-actions">
+        <button type="button" id="pwCancel" class="button">취소</button>
+        <button type="submit" id="pwSubmit" class="btn-primary button">확인</button>
+      </div>
+    </form>
+  </dialog>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
@@ -641,7 +689,37 @@
     };
     // ====================================================================
 
-    const TEACHER_PASSWORD = "4496";
+    // ====== 강의자 비밀번호 ======
+    // 평문을 두지 않습니다. PBKDF2-SHA256(310,000회) 해시만 저장합니다.
+    // 비밀번호를 바꾸려면 README의 "비밀번호 변경" 절차를 따르세요.
+    //
+    // ⚠️ 한계를 분명히 알아두세요. 이 파일은 공개된 정적 페이지라
+    //    브라우저 개발자도구로 이 검사를 우회하는 것은 언제든 가능합니다.
+    //    이 잠금은 "실수 방지"이지 보안이 아닙니다.
+    //    실제 데이터 보호는 Firebase 보안 규칙이 담당합니다.
+    const TEACHER_AUTH = {
+      salt: "926473cda3686406de178c00e1077e60",
+      iterations: 310000,
+      hash: "887a1f80783e8e415cc2de4dbc607f5f29a239b6d8700ced0d20f91c681ec046"
+    };
+
+    const hexToBytes = (hex) =>
+      new Uint8Array(hex.match(/../g).map(h => parseInt(h, 16)));
+    const bytesToHex = (buf) =>
+      [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+
+    async function verifyTeacherPassword(pw) {
+      if (!(window.crypto && crypto.subtle)) return null;   // 판정 불가 (비보안 컨텍스트)
+      const key = await crypto.subtle.importKey(
+        "raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveBits"]
+      );
+      const bits = await crypto.subtle.deriveBits(
+        { name: "PBKDF2", salt: hexToBytes(TEACHER_AUTH.salt),
+          iterations: TEACHER_AUTH.iterations, hash: "SHA-256" },
+        key, 256
+      );
+      return bytesToHex(bits) === TEACHER_AUTH.hash;
+    }
     const DB_PATH = "rooms/default/messages";
     const PROFILE_PATH = "rooms/default/profile";
     const CATEGORIES_PATH = "rooms/default/categories";
@@ -689,14 +767,54 @@
     const pfIconEl = document.getElementById("pfIcon");
 
     // ---- Mode ----
-    function enterTeacher() {
-      const pw = window.prompt("강의자 비밀번호를 입력하세요");
-      if (pw === null) return;
-      if (pw !== TEACHER_PASSWORD) { alert("비밀번호가 올바르지 않습니다."); return; }
+    // 비밀번호는 window.prompt가 아니라 type=password 다이얼로그로 받는다.
+    // prompt는 입력한 글자가 그대로 보여서, 화면 공유 중이면 송출 화면에 노출된다.
+    const pwDialogEl = document.getElementById("pwDialog");
+    const pwFormEl = document.getElementById("pwForm");
+    const pwInputEl = document.getElementById("pwInput");
+    const pwErrorEl = document.getElementById("pwError");
+    const pwSubmitEl = document.getElementById("pwSubmit");
+
+    function openPasswordDialog() {
+      pwInputEl.value = "";
+      pwErrorEl.textContent = "";
+      pwSubmitEl.disabled = false;
+      pwDialogEl.showModal();
+      pwInputEl.focus();
+    }
+    document.getElementById("pwCancel").addEventListener("click", () => pwDialogEl.close());
+    // 닫힐 때 입력값을 남기지 않는다 (다음에 열었을 때 잔상 방지)
+    pwDialogEl.addEventListener("close", () => { pwInputEl.value = ""; });
+
+    pwFormEl.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pw = pwInputEl.value;
+      if (!pw) { pwErrorEl.textContent = "비밀번호를 입력하세요."; return; }
+      pwSubmitEl.disabled = true;
+      pwErrorEl.textContent = "확인 중…";
+      const ok = await verifyTeacherPassword(pw);
+      if (ok === null) {
+        pwErrorEl.textContent = "이 환경에서는 확인할 수 없습니다. https 주소로 접속해 주세요.";
+        pwSubmitEl.disabled = false;
+        return;
+      }
+      if (!ok) {
+        pwErrorEl.textContent = "비밀번호가 올바르지 않습니다.";
+        pwInputEl.value = "";
+        pwInputEl.focus();
+        pwSubmitEl.disabled = false;
+        return;
+      }
+      // 입력값을 DOM에 남기지 않는다 (close 이벤트 타이밍에 의존하지 않도록 명시적으로)
+      pwInputEl.value = "";
+      pwErrorEl.textContent = "";
+      pwDialogEl.close();
       mode = "teacher";
       location.hash = "teacher";
       applyMode();
-    }
+    });
+
+    function enterTeacher() { openPasswordDialog(); }
     function exitTeacher() {
       mode = "student";
       editingId = null;
