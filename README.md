@@ -122,8 +122,24 @@ Realtime Database → **규칙** 탭에서 아래로 설정하면 이 앱의 데
 - `index.html` — 앱 전체(HTML/CSS/JS 인라인). 이 파일 하나만 배포하면 됩니다.
 - `README.md` — 이 문서.
 
+## 디자인 시스템
+
+이 앱의 디자인은 [sehunYang.github.io](https://github.com/sehunYang/sehunYang.github.io)의 `css/main.css`를 기준으로 통일되어 있습니다.
+`index.html`의 `<style>` 블록은 두 구획으로 나뉩니다.
+
+- **`PORTABLE: TOKENS + PRIMITIVES`** — 색 토큰, 타이포, `.button` / `.icon-button` / `.notice` / `.toast`.
+  다른 프로젝트에 같은 디자인을 입힐 때는 **이 블록만 복사**하면 됩니다.
+- **`APP-SPECIFIC`** — 강의 보드 전용 규칙(버블, 수업 칩, 프로필 카드 등).
+
+> ⚠️ 두 구획의 **순서를 바꾸지 마세요.** `.button`과 `.btn-primary`는 CSS 특이성이 같아 나중에 선언된 쪽이 이깁니다.
+> APP-SPECIFIC이 앞으로 오면 저장 버튼이 회색으로 보이는 오류가 납니다.
+
+**다크 모드**는 우측 상단 `◐` 버튼으로 전환하며, 선택은 브라우저에 저장됩니다.
+처음 방문하면 운영체제 설정을 따릅니다. 테마 적용 코드는 `<head>`에 있어 사내망에서 Firebase가 차단돼도 정상 동작합니다.
+
 ## 커스터마이즈
 - 비밀번호: `index.html`의 `const TEACHER_PASSWORD = "";`
-- 글자 크기: `.bubble .text { font-size: 1.5rem; }`
-- 버블 색상: `:root`의 `--bubble`, `--bubble-border`
-- 글꼴: KoPubWorld돋움체(웹폰트 CDN 자동 로드). 오프라인/사내망이면 폰트를 직접 내려받아 로컬 `@font-face`로 교체하세요.
+- 글자 크기: 전체 배율은 `html { font-size: 17px; }` (모바일 16px), 버블 본문만 바꾸려면 `.bubble .text { font-size: 1.5rem; }`
+- 색상: `:root`와 `[data-theme="dark"]`의 토큰(`--accent`, `--surface`, `--text` 등). 개별 규칙에 색을 직접 적지 말고 토큰을 고치세요.
+- 글꼴: Pretendard Variable(웹폰트 CDN 자동 로드). 오프라인/사내망이면 폰트를 직접 내려받아 로컬 `@font-face`로 교체하세요.
+  CDN이 막혀도 `--font`의 폴백(맑은 고딕 등)으로 표시됩니다.
