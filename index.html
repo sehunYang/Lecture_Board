@@ -22,6 +22,7 @@
   <link rel="icon" href="assets/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+  <link rel="manifest" href="assets/manifest.webmanifest" />
   <meta name="apple-mobile-web-app-title" content="강의 보드" />
 
   <!-- Open Graph (카카오톡·페이스북 등 링크 미리보기) -->
@@ -58,6 +59,16 @@
         r.dataset.theme = r.dataset.theme === "dark" ? "light" : "dark";
         try { localStorage.setItem("theme", r.dataset.theme); } catch (err) {}
       });
+
+      /* 부팅 감시견.
+         앱 모듈은 gstatic에서 Firebase SDK를 가져온다. 학교·사내망이 그 도메인을 막으면
+         모듈 본문이 한 줄도 실행되지 않아, 예전에는 헤더만 남은 빈 화면이 됐다.
+         모듈이 살아 있으면 __boardBooted를 세우므로, 안 세워졌으면 여기서 이유를 알린다. */
+      setTimeout(function () {
+        if (window.__boardBooted) return;
+        var el = document.getElementById("bootBanner");
+        if (el) el.classList.remove("hidden");
+      }, 6000);
     })();
   </script>
   <style>
@@ -439,6 +450,20 @@
       border-radius: 999px;
       padding: 3px 10px;
     }
+    /* 수강생 화면의 복사 버튼. 버블 전체 클릭도 그대로 되지만,
+       키보드·스크린리더에는 이 진짜 버튼이 유일한 경로다. */
+    .bubble .btn-copy {
+      flex-shrink: 0;
+      align-self: flex-start;
+      padding: 0.35rem 0.85rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+    }
+    .bubble .btn-copy:hover { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
     .bubble .cat-select { margin-top: 0.55rem; font-size: 0.8rem; padding: 0.25rem 0.55rem; }
     .bubble .content-foot { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
     .bubble .num {
@@ -497,6 +522,161 @@
     .bubble .edit-row { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.6rem; width: 100%; }
 
     .empty { color: var(--muted); text-align: center; padding: 3rem 0; font-size: 1.05rem; }
+
+    /* ── 코드 표시 모드 ────────────────────────────────────────────────
+       강의 중 붙여넣는 명령어·코드를 읽기 쉽게 만든다.
+       토큰 색은 accent 계열과 부딪히지 않도록 별도 토큰으로 둔다. */
+    :root {
+      --code-bg: #f4f4f0;
+      --tok-str: #0a7d55;
+      --tok-num: #9a4b00;
+      --tok-key: #7c3aed;
+      /* 주석도 읽히는 글자다. #8a8a80 on #f4f4f0 = 2.9:1 (AA 미달)
+         → #6f6f66 = 4.5:1. 다크의 #7d8076 on #14150f 는 4.6:1로 이미 통과. */
+      --tok-com: #6f6f66;
+      --ind-1: rgba(37, 99, 235, 0.10);
+      --ind-2: rgba(139, 92, 246, 0.10);
+      --ind-3: rgba(16, 163, 127, 0.10);
+      --ind-4: rgba(217, 119, 6, 0.10);
+    }
+    [data-theme="dark"] {
+      --code-bg: #14150f;
+      --tok-str: #6ed3a2;
+      --tok-num: #e0a860;
+      --tok-key: #c4a2ff;
+      --tok-com: #7d8076;
+      --ind-1: rgba(125, 177, 255, 0.13);
+      --ind-2: rgba(196, 162, 255, 0.13);
+      --ind-3: rgba(110, 211, 162, 0.13);
+      --ind-4: rgba(224, 168, 96, 0.13);
+    }
+
+    .bubble .text.code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas,
+                   "D2Coding", "Liberation Mono", Menlo, monospace;
+      font-size: 1.12rem;
+      line-height: 1.62;
+      letter-spacing: 0;
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.7rem 0.85rem;
+    }
+    /* 가로 스크롤은 펼친 상태에서만 의미가 있다.
+       .clamped 는 overflow:hidden 으로 줄 수를 세므로 거기에 얹으면 죽은 선언이 된다. */
+    .bubble .text.code:not(.clamped) { overflow-x: auto; }
+    /* 코드는 3줄이면 너무 짧다 — 접힌 상태에서도 8줄까지 보여준다. */
+    .bubble .text.code.clamped {
+      -webkit-line-clamp: 8;
+      line-clamp: 8;
+    }
+
+    .tok-str { color: var(--tok-str); }
+    .tok-num { color: var(--tok-num); }
+    .tok-key { color: var(--tok-key); font-weight: 600; }
+    .tok-com { color: var(--tok-com); font-style: italic; }
+
+    /* indent-rainbow: 들여쓰기 한 칸마다 색을 돌려 깊이를 눈으로 잡게 한다. */
+    .ind { border-left: 2px solid transparent; }
+    .ind-0 { background: var(--ind-1); border-left-color: color-mix(in srgb, var(--tok-key) 35%, transparent); }
+    .ind-1 { background: var(--ind-2); border-left-color: color-mix(in srgb, var(--tok-str) 35%, transparent); }
+    .ind-2 { background: var(--ind-3); border-left-color: color-mix(in srgb, var(--tok-num) 35%, transparent); }
+    .ind-3 { background: var(--ind-4); border-left-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+
+    /* color highlight: #2563eb, rgb(...), hsl(...) 옆에 실제 색 견본을 붙인다. */
+    .swatch {
+      display: inline-block;
+      width: 0.72em;
+      height: 0.72em;
+      margin-right: 0.28em;
+      vertical-align: -0.04em;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+    }
+
+    .bubble .code-tag {
+      display: inline-block;
+      margin-top: 0.55rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 9px;
+    }
+    .composer .code-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .composer .code-row input { width: 1rem; height: 1rem; accent-color: var(--accent); }
+
+    /* ── 강의자 도구 바 (방 이름 · 로그인 · 내보내기) ───────────────── */
+    .teacher-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.9rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .teacher-bar .room-name {
+      font-weight: 700;
+      color: var(--text);
+      background: var(--accent-soft);
+      border-radius: 999px;
+      padding: 3px 10px;
+    }
+    .teacher-bar .spacer { flex: 1; }
+    .teacher-bar button { padding: 0.3rem 0.7rem; font-size: 0.82rem; }
+    .uid-box {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.78rem;
+      word-break: break-all;
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.4rem 0.6rem;
+      margin-top: 0.4rem;
+    }
+
+    /* ── 범용 입력/확인 다이얼로그 (prompt·confirm 대체) ────────────── */
+    .ask-dialog { max-width: 26rem; }
+    .ask-dialog .ask-msg { margin: 0 0 0.8rem; white-space: pre-wrap; line-height: 1.55; }
+    .ask-dialog .ask-input {
+      width: 100%;
+      font: inherit;
+      padding: 0.6rem 0.7rem;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .ask-dialog .ask-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    /* 오류 토스트: 복사 성공 토스트와 같은 자리를 쓰되 색으로 구분한다. */
+    .toast.is-error { border-color: var(--danger); }
+    .toast.is-error .toast-msg { color: var(--danger); }
+
+    /* 연결 끊김 표시 */
+    .conn-warn {
+      display: none;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--danger);
+      white-space: nowrap;
+    }
+    .conn-warn.is-on { display: inline; }
 
     /* Profile editor (teacher only) */
     .profile-editor {
@@ -631,6 +811,7 @@
   <header class="site-header">
     <h1 id="title">강의 보드</h1>
     <div class="header-tools">
+      <span id="connWarn" class="conn-warn" role="status">연결 끊김</span>
       <button id="modeToggle" class="btn-mode button secondary">강의자 모드</button>
       <button id="theme-toggle" class="icon-button" type="button" aria-label="색상 모드 전환">◐</button>
     </div>
@@ -642,17 +823,42 @@
       본인 프로젝트 값으로 교체하세요. 방법은 <code>README.md</code> 참고.
     </div>
 
+    <!-- 앱 모듈이 6초 안에 부팅하지 못하면 <head>의 감시견이 이 배너를 켠다.
+         가장 흔한 원인은 학교·사내망의 gstatic.com 차단이다. -->
+    <div id="bootBanner" class="banner notice hidden">
+      ⚠️ 실시간 동기화 모듈을 불러오지 못했습니다.
+      이 네트워크가 <code>gstatic.com</code>을 차단하고 있을 가능성이 큽니다.
+      다른 네트워크(휴대폰 테더링 등)로 접속해 보세요.
+    </div>
+
+
     <!-- 수업 종류 선택 바 (강의자: 선택·추가·수정, 수강생: 현재 수업 표시) -->
     <div id="classBar" class="classbar hidden"></div>
 
+    <!-- 강의자 전용: 방 이름 · 로그인 · 백업 -->
+    <div id="teacherBar" class="teacher-bar hidden">
+      <span>보드</span>
+      <span id="roomName" class="room-name">default</span>
+      <span id="hideNote"></span>
+      <span class="spacer"></span>
+      <button id="exportBtn" type="button">내보내기</button>
+      <button id="importBtn" type="button">불러오기</button>
+      <input id="importFile" type="file" accept="application/json,.json" hidden />
+      <span id="authArea"></span>
+    </div>
+
     <!-- 강의자 전용 작성 영역 -->
     <div id="teacherComposer" class="composer hidden">
-      <textarea id="input" placeholder="여기에 글을 적고 저장하세요 (여러 줄 가능)"></textarea>
+      <textarea id="input" maxlength="4000" placeholder="여기에 글을 적고 저장하세요 (여러 줄 가능)"></textarea>
       <div class="composer-row">
         <div class="cat-row">
           <label for="msgCategory">수업 종류</label>
           <select id="msgCategory"></select>
         </div>
+        <label class="code-row" for="msgCode">
+          <input id="msgCode" type="checkbox" />
+          <span>코드로 표시</span>
+        </label>
         <button id="saveBtn" class="btn-primary button">저장</button>
       </div>
       <div class="bulk-row">
@@ -672,11 +878,11 @@
       </button>
       <div id="pfBody" class="pf-body hidden">
         <label for="pfName">이름</label>
-        <input id="pfName" type="text" placeholder="이름" autocomplete="off" />
+        <input id="pfName" type="text" maxlength="80" placeholder="이름" autocomplete="off" />
         <label for="pfAffiliation">소속</label>
-        <input id="pfAffiliation" type="text" placeholder="소속" autocomplete="off" />
+        <input id="pfAffiliation" type="text" maxlength="120" placeholder="소속" autocomplete="off" />
         <label for="pfContact">Contact (여러 줄 입력 가능 — SNS, 이메일 등)</label>
-        <textarea id="pfContact" placeholder="예)&#10;Email: name@example.com&#10;Instagram: @handle"></textarea>
+        <textarea id="pfContact" maxlength="600" placeholder="예)&#10;Email: name@example.com&#10;Instagram: @handle"></textarea>
         <div class="pe-row">
           <button id="pfSaveBtn" class="btn-primary button">프로필 저장</button>
         </div>
@@ -698,8 +904,8 @@
     <form id="pwForm" method="dialog">
       <h2 id="pwTitle" class="pw-title">강의자 모드</h2>
       <label class="pw-label" for="pwInput">비밀번호</label>
-      <input id="pwInput" class="pw-input" type="password" inputmode="numeric"
-             autocomplete="current-password" placeholder="••••" />
+      <input id="pwInput" class="pw-input" type="password"
+             autocomplete="current-password" placeholder="비밀번호" />
       <p id="pwError" class="pw-error" role="alert"></p>
       <div class="pw-actions">
         <button type="button" id="pwCancel" class="button">취소</button>
@@ -708,11 +914,25 @@
     </form>
   </dialog>
 
+  <!-- 범용 입력·확인 다이얼로그.
+       window.prompt/confirm은 화면 송출 중에 브라우저 크롬 위로 떠서 보드와 따로 놀고,
+       모바일에서는 특히 거슬린다. 비밀번호 다이얼로그와 같은 결로 통일한다. -->
+  <dialog id="askDialog" class="pw-dialog ask-dialog" aria-labelledby="askTitle">
+    <form id="askForm" method="dialog">
+      <h2 id="askTitle" class="pw-title">확인</h2>
+      <p id="askMsg" class="ask-msg"></p>
+      <input id="askInput" class="ask-input" type="text" autocomplete="off" />
+      <div class="ask-actions">
+        <button type="button" id="askCancel" class="button">취소</button>
+        <button type="submit" id="askOk" class="btn-primary button">확인</button>
+      </div>
+    </form>
+  </dialog>
+
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getDatabase, ref, push, onValue, update, remove, get, child
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    // 이 줄이 실행되면 모듈은 살아 있다 — <head>의 부팅 감시견을 끈다.
+    // (SDK를 못 받아오는 경우는 아래에서 더 구체적인 배너로 따로 알린다.)
+    window.__boardBooted = true;
 
     // ====== Firebase 설정 (본인 값으로 교체하세요 — README.md 참고) ======
     const firebaseConfig = {
@@ -726,14 +946,26 @@
     };
     // ====================================================================
 
-    // ====== 강의자 비밀번호 ======
-    // 평문을 두지 않습니다. PBKDF2-SHA256(310,000회) 해시만 저장합니다.
-    // 비밀번호를 바꾸려면 README의 "비밀번호 변경" 절차를 따르세요.
+    // ====== 강의자 인증 ======
     //
-    // ⚠️ 한계를 분명히 알아두세요. 이 파일은 공개된 정적 페이지라
-    //    브라우저 개발자도구로 이 검사를 우회하는 것은 언제든 가능합니다.
-    //    이 잠금은 "실수 방지"이지 보안이 아닙니다.
-    //    실제 데이터 보호는 Firebase 보안 규칙이 담당합니다.
+    // 두 가지 방식을 지원합니다. 지금은 1번이 켜져 있습니다.
+    //
+    // 1) 비밀번호 (AUTH.enabled = false) — 지금까지의 방식.
+    //    브라우저 안에서만 검사하므로 개발자도구로 우회할 수 있고,
+    //    DB는 여전히 누구나 쓸 수 있습니다. "실수 방지"이지 보안이 아닙니다.
+    //    숨긴 글도 수강생 브라우저로 전송된 뒤 화면에서만 걸러집니다.
+    //
+    // 2) Google 로그인 (AUTH.enabled = true) — 권장.
+    //    DB 규칙이 강의자 uid만 쓰기를 허용하고, 숨긴 글은 강의자만 읽을 수 있는
+    //    drafts 경로에 보관합니다. 즉 아직 공개하지 않은 글은 수강생에게
+    //    아예 전송되지 않습니다. 설정 방법은 README의 "강의자 인증" 절 참고.
+    const AUTH = {
+      enabled: false,   // ← Firebase Authentication 설정을 마치면 true
+      ownerUid: ""      // ← 로그인 후 화면에 표시되는 uid를 붙여넣기
+    };
+
+    // 비밀번호 방식(1번)에서만 쓰입니다. 평문을 두지 않고 PBKDF2-SHA256 해시만 저장합니다.
+    // 바꾸려면 README의 "비밀번호 변경" 절차를 따르세요.
     const TEACHER_AUTH = {
       salt: "b1aaced307c8f58094541122155cbef8",
       iterations: 310000,
@@ -757,41 +989,30 @@
       );
       return bytesToHex(bits) === TEACHER_AUTH.hash;
     }
-    const DB_PATH = "rooms/default/messages";
-    const PROFILE_PATH = "rooms/default/profile";
-    const CATEGORIES_PATH = "rooms/default/categories";
-    const STATE_PATH = "rooms/default/state";
 
-    const configured = firebaseConfig.apiKey !== "YOUR_API_KEY";
-    let db = null, messagesRef = null, profileRef = null, categoriesRef = null, stateRef = null;
-    if (configured) {
-      const app = initializeApp(firebaseConfig);
-      db = getDatabase(app);
-      messagesRef = ref(db, DB_PATH);
-      profileRef = ref(db, PROFILE_PATH);
-      categoriesRef = ref(db, CATEGORIES_PATH);
-      stateRef = ref(db, STATE_PATH);
-    } else {
-      document.getElementById("setupBanner").classList.remove("hidden");
-    }
-
-    // ---- State ----
-    let messages = [];            // [{id, text, createdAt, hidden, categoryId}]
-    let categories = [];          // [{id, name, createdAt, order}]
-    let activeCategory = "";      // "" = 전체 보기 (강의자·수강생 화면 공통, DB로 동기화)
-    let mode = "student";         // 'student' | 'teacher'
-    let editingId = null;
-    const expanded = new Set();   // 3줄 클램프를 펼쳐둔 메시지 id
-    let renderToken = 0;          // 겹친 렌더의 지연 측정 무효화용
-    let profile = { name: "", affiliation: "", contact: "" };
+    // ====== 방(room) ======
+    // ?room=physics2026 으로 보드를 나눌 수 있습니다. 없으면 default.
+    // 강의자 여러 명이 같은 배포본을 쓰거나, 한 사람이 수업별로 보드를 분리할 때 씁니다.
+    const ROOM = ((new URLSearchParams(location.search).get("room") || "default")
+      .replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40)) || "default";
+    const BASE = `rooms/${ROOM}`;
+    const DB_PATH = `${BASE}/messages`;
+    const DRAFTS_PATH = `${BASE}/drafts`;
+    const PROFILE_PATH = `${BASE}/profile`;
+    const CATEGORIES_PATH = `${BASE}/categories`;
+    const STATE_PATH = `${BASE}/state`;
 
     // ---- Elements ----
     const listEl = document.getElementById("list");
     const emptyEl = document.getElementById("empty");
     const composerEl = document.getElementById("teacherComposer");
+    const teacherBarEl = document.getElementById("teacherBar");
+    const roomNameEl = document.getElementById("roomName");
+    const authAreaEl = document.getElementById("authArea");
     const modeToggle = document.getElementById("modeToggle");
     const titleEl = document.getElementById("title");
     const inputEl = document.getElementById("input");
+    const msgCodeEl = document.getElementById("msgCode");
     const classBarEl = document.getElementById("classBar");
     const msgCategoryEl = document.getElementById("msgCategory");
     const profileEditorEl = document.getElementById("profileEditor");
@@ -802,10 +1023,398 @@
     const pfToggleEl = document.getElementById("pfToggle");
     const pfBodyEl = document.getElementById("pfBody");
     const pfIconEl = document.getElementById("pfIcon");
+    const connWarnEl = document.getElementById("connWarn");
+    const bootBannerEl = document.getElementById("bootBanner");
 
-    // ---- Mode ----
-    // 비밀번호는 window.prompt가 아니라 type=password 다이얼로그로 받는다.
-    // prompt는 입력한 글자가 그대로 보여서, 화면 공유 중이면 송출 화면에 노출된다.
+    // ---- 토스트 (성공/실패 공용) ----
+    const toastEl = document.getElementById("toast");
+    const toastMsgEl = toastEl.querySelector(".toast-msg");
+    const toastPreviewEl = document.getElementById("toastPreview");
+    let toastTimer = null;
+
+    function showToast(message, preview, isError) {
+      toastMsgEl.textContent = message;
+      toastPreviewEl.textContent = preview || "";
+      toastEl.classList.toggle("is-error", !!isError);
+      toastEl.classList.add("is-visible");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, isError ? 4200 : 2400);
+    }
+    function hideToast() {
+      clearTimeout(toastTimer);
+      toastEl.classList.remove("is-visible");
+    }
+
+    // ---- 범용 입력/확인 다이얼로그 (window.prompt·confirm 대체) ----
+    const askDialogEl = document.getElementById("askDialog");
+    const askFormEl = document.getElementById("askForm");
+    const askTitleEl = document.getElementById("askTitle");
+    const askMsgEl = document.getElementById("askMsg");
+    const askInputEl = document.getElementById("askInput");
+    const askOkEl = document.getElementById("askOk");
+    let askResolve = null;
+
+    function closeAsk(value) {
+      const fn = askResolve;
+      askResolve = null;
+      if (askDialogEl.open) askDialogEl.close();
+      if (fn) fn(value);
+    }
+    askFormEl.addEventListener("submit", (e) => {
+      e.preventDefault();
+      closeAsk(askInputEl.hidden ? true : askInputEl.value);
+    });
+    document.getElementById("askCancel").addEventListener("click", () => closeAsk(null));
+    // ESC로 닫혀도 약속은 반드시 지킨다 (안 그러면 호출한 쪽이 영영 기다린다).
+    // 'close'가 아니라 'cancel'을 듣는 이유: close 는 .close() 로도 울리고 비동기라,
+    // 앞 물음을 닫으며 예약된 이벤트가 뒤늦게 도착해 새로 연 물음을 취소해 버린다.
+    // cancel 은 사용자가 ESC 로 닫을 때만 울린다 — 딱 필요한 경우다.
+    askDialogEl.addEventListener("cancel", (e) => {
+      e.preventDefault();
+      closeAsk(null);
+    });
+
+    function ask({ title, message, value, okLabel, danger }) {
+      askTitleEl.textContent = title;
+      askMsgEl.textContent = message || "";
+      askMsgEl.hidden = !message;
+      askOkEl.textContent = okLabel || "확인";
+      askOkEl.classList.toggle("btn-danger", !!danger);
+      if (value === undefined) {
+        askInputEl.hidden = true;
+        askInputEl.value = "";
+      } else {
+        askInputEl.hidden = false;
+        askInputEl.value = value;
+      }
+      return new Promise((resolve) => {
+        // 이미 열려 있으면 앞의 것을 취소로 매듭짓고 자리를 넘긴다.
+        if (askDialogEl.open || askResolve) closeAsk(null);
+        askResolve = resolve;
+        askDialogEl.showModal();
+        if (!askInputEl.hidden) { askInputEl.focus(); askInputEl.select(); }
+        else askOkEl.focus();
+      });
+    }
+    const askText = (title, message, value) => ask({ title, message, value: value || "" });
+    const askConfirm = (title, message, okLabel, danger) =>
+      ask({ title, message, okLabel: okLabel || "확인", danger }).then(v => v === true);
+
+    function notify(message) { return ask({ title: "알림", message, okLabel: "닫기" }); }
+
+    // ====== Firebase SDK 로드 ======
+    // 정적 import는 gstatic이 막히면 모듈 전체가 실행조차 안 되고 빈 화면이 남는다.
+    // 동적 import로 바꿔 실패를 잡고, 왜 안 되는지 화면에 적어 준다.
+    const SDK = "https://www.gstatic.com/firebasejs/10.12.2";
+    const configured = firebaseConfig.apiKey !== "YOUR_API_KEY";
+
+    let fb = null;      // firebase-database 모듈
+    let authMod = null; // firebase-auth 모듈 (AUTH.enabled 일 때만)
+    let db = null, app = null, auth = null;
+    let pendingTeacher = false;   // 로그인 끝나면 강의자 화면으로 갈지
+    let messagesRef = null, draftsRef = null, profileRef = null,
+        categoriesRef = null, stateRef = null, baseRef = null;
+
+    // 이 앱은 사용자 글을 단 한 번도 innerHTML로 넣지 않는다 — 전부 textContent다.
+    // 안내 문구도 마크업에 미리 적어 두고 여기서는 보이기만 한다.
+    function showLoadError() {
+      bootBannerEl.classList.remove("hidden");
+    }
+
+    if (!configured) {
+      document.getElementById("setupBanner").classList.remove("hidden");
+    } else {
+      try {
+        const [appMod, dbMod] = await Promise.all([
+          import(`${SDK}/firebase-app.js`),
+          import(`${SDK}/firebase-database.js`)
+        ]);
+        fb = dbMod;
+        app = appMod.initializeApp(firebaseConfig);
+        db = dbMod.getDatabase(app);
+        baseRef = dbMod.ref(db, BASE);
+        messagesRef = dbMod.ref(db, DB_PATH);
+        draftsRef = dbMod.ref(db, DRAFTS_PATH);
+        profileRef = dbMod.ref(db, PROFILE_PATH);
+        categoriesRef = dbMod.ref(db, CATEGORIES_PATH);
+        stateRef = dbMod.ref(db, STATE_PATH);
+
+        if (AUTH.enabled) {
+          authMod = await import(`${SDK}/firebase-auth.js`);
+          auth = authMod.getAuth(app);
+          auth.useDeviceLanguage();
+          // 리디렉션 로그인으로 돌아온 경우 여기서 결과(주로 오류)를 받는다.
+          authMod.getRedirectResult(auth).catch(() => {});
+        }
+      } catch (err) {
+        // 감시견(6초)을 기다릴 것 없이 지금 바로 알린다.
+        showLoadError();
+      }
+    }
+    const online = !!db;
+
+    // ---- State ----
+    let messages = [];            // [{id, text, createdAt, updatedAt, hidden, code, categoryId, order}]
+    let liveMessages = {};        // messages 경로 원본
+    let draftMessages = {};       // drafts 경로 원본 (강의자만 읽힘)
+    let categories = [];
+    let categoriesKey = "";       // id→name 지문. 카운터로 두면 무관한 변경에도 전체가 다시 그려진다
+    let activeCategory = "";
+    let mode = "student";
+    let editingId = null;
+    let switchingEdit = false;   // 수정 전환 확인 대화가 떠 있는 동안
+    let currentUser = null;
+    let serverSkew = 0;           // 서버 시각 - 내 시각 (수강생 기기 시계 오차 보정)
+    const expanded = new Set();
+    let renderToken = 0;
+    let profile = { name: "", affiliation: "", contact: "" };
+
+    const nowMs = () => Date.now() + serverSkew;
+
+    // ownerUid를 아직 안 채운 '설정 중' 상태.
+    // 이때는 로그인한 사람을 강의자로 대접해서 uid를 확인할 수 있게 한다.
+    // 실제 쓰기 권한은 DB 규칙이 쥐고 있으므로 이게 구멍이 되지는 않는다.
+    const setupPending = () => AUTH.enabled && !AUTH.ownerUid;
+    const isOwner = () => AUTH.enabled && !!currentUser &&
+      (setupPending() || currentUser.uid === AUTH.ownerUid);
+    // 이 화면에서 강의자 권한을 쓸 수 있는가
+    const canTeach = () => AUTH.enabled ? isOwner() : true;
+
+    /* ==========================================================================
+       코드 표시 모드 — 구문 강조 · indent-rainbow · color highlight
+       외부 라이브러리를 쓰지 않는다. 강의 중 붙여넣는 명령어·코드가 대상이라
+       완벽한 파서가 아니라 "눈에 잘 들어오는 정도"면 충분하고,
+       무엇보다 오프라인·사내망에서도 그대로 동작해야 한다.
+       ========================================================================== */
+
+    const CODE_KEYWORDS = new Set([
+      // 제어 흐름 (여러 언어 공통)
+      "if", "else", "elif", "for", "while", "do", "done", "then", "fi", "case", "esac",
+      "switch", "break", "continue", "return", "yield", "pass", "try", "catch", "except",
+      "finally", "raise", "throw", "with", "as", "in", "of", "is", "not", "and", "or",
+      // 선언
+      "function", "def", "class", "const", "let", "var", "import", "from", "export",
+      "default", "async", "await", "lambda", "new", "this", "self", "public", "private",
+      "static", "void", "int", "float", "str", "bool", "struct", "type", "interface",
+      // 리터럴
+      "true", "false", "null", "undefined", "None", "True", "False", "nil",
+      // 자주 쓰는 명령어
+      "sudo", "apt", "pip", "npm", "npx", "yarn", "git", "docker", "python", "python3",
+      "node", "cd", "ls", "mkdir", "rm", "cp", "mv", "cat", "echo", "curl", "wget",
+      "chmod", "grep", "find", "ssh", "make", "print", "conda", "source", "export"
+    ]);
+
+    // #2563eb · #fff · rgb(...) · hsl(...) 형태만 색으로 본다.
+    const COLOR_RE = /^(?:#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-fA-F])|(?:rgba?|hsla?)\([^()\n]{1,64}\))/;
+
+    function tokenizeCode(line) {
+      const out = [];
+      let i = 0, plain = "";
+      const flush = () => { if (plain) { out.push({ t: "", v: plain }); plain = ""; } };
+      const push = (t, v) => { flush(); out.push({ t, v }); i += v.length; };
+
+      while (i < line.length) {
+        const rest = line.slice(i);
+        const prev = i > 0 ? line[i - 1] : "";
+        let m;
+
+        // 색상값을 주석보다 먼저 본다 — '#2563eb'는 주석이 아니다.
+        m = rest.match(COLOR_RE);
+        if (m) { push("color", m[0]); continue; }
+
+        // '#' 주석: 줄 첫머리이거나 공백 뒤일 때만. (URL의 example.com#top 을 지키려고)
+        if (rest[0] === "#" && (i === 0 || /\s/.test(prev))) { push("com", rest); continue; }
+
+        // '//' 주석: 앞이 ':' 이면 URL(https://)이므로 건드리지 않는다.
+        if (rest.startsWith("//") && prev !== ":") { push("com", rest); continue; }
+
+        m = rest.match(/^\/\*[\s\S]*?(?:\*\/|$)/);
+        if (m) { push("com", m[0]); continue; }
+
+        // 문자열 — 닫히지 않은 채 줄이 끝나도 그 줄 끝까지 문자열로 본다.
+        m = rest.match(/^(['"`])(?:\\[\s\S]|(?!\1)[^\\])*(?:\1|$)/);
+        if (m) { push("str", m[0]); continue; }
+
+        // 단어를 통째로 집어서 'abc123'이 숫자로 쪼개지지 않게 한다.
+        m = rest.match(/^[A-Za-z_$][A-Za-z0-9_$]*/);
+        if (m) { push(CODE_KEYWORDS.has(m[0]) ? "key" : "", m[0]); continue; }
+
+        m = rest.match(/^\d[0-9a-fA-FxX._]*/);
+        if (m) { push("num", m[0]); continue; }
+
+        plain += line[i];
+        i++;
+      }
+      flush();
+      return out;
+    }
+
+    // 들여쓰기를 '한 단계'씩 끊는다. 탭은 그 자체로 한 단계, 공백은 두 칸이 한 단계.
+    function indentUnits(ws) {
+      const units = [];
+      let i = 0;
+      while (i < ws.length) {
+        if (ws[i] === "\t") { units.push("\t"); i++; continue; }
+        let chunk = "";
+        while (i < ws.length && ws[i] === " " && chunk.length < 2) { chunk += ws[i]; i++; }
+        units.push(chunk);
+      }
+      return units;
+    }
+
+    // 강조된 코드를 container에 그린다. 원문은 손대지 않는다 — 복사는 항상 m.text를 쓴다.
+    function renderCode(container, text) {
+      container.textContent = "";
+      text.split("\n").forEach((line, li) => {
+        if (li) container.appendChild(document.createTextNode("\n"));
+        const ws = line.match(/^[ \t]*/)[0];
+        if (ws) {
+          indentUnits(ws).forEach((u, k) => {
+            const s = document.createElement("span");
+            s.className = "ind ind-" + (k % 4);
+            s.textContent = u;
+            container.appendChild(s);
+          });
+        }
+        tokenizeCode(line.slice(ws.length)).forEach(tok => {
+          if (tok.t === "color") {
+            const sw = document.createElement("span");
+            sw.className = "swatch";
+            // DOM API로 넣으므로 잘못된 값은 브라우저가 조용히 무시한다 (주입 경로 없음)
+            sw.style.backgroundColor = tok.v;
+            container.appendChild(sw);
+            const s = document.createElement("span");
+            s.className = "tok-num";
+            s.textContent = tok.v;
+            container.appendChild(s);
+          } else if (tok.t) {
+            const s = document.createElement("span");
+            s.className = "tok-" + tok.t;
+            s.textContent = tok.v;
+            container.appendChild(s);
+          } else {
+            container.appendChild(document.createTextNode(tok.v));
+          }
+        });
+      });
+    }
+
+    // 작성창의 '코드로 표시'를 미리 켜 주기 위한 어림짐작. 강의자가 언제든 끌 수 있다.
+    function looksLikeCode(t) {
+      if (!t) return false;
+      if (/^\s*[$>][ \t]+\S/m.test(t)) return true;            // 셸 프롬프트
+      if (/[;{}]\s*$/m.test(t)) return true;
+      if (t.includes("\n") && /^[ \t]{2,}\S/m.test(t)) return true;  // 들여쓴 줄
+      return /\b(def|function|class|import|const|let|var|sudo|npm|pip|git|docker|curl)\b/.test(t);
+    }
+
+    /* ========================== 쓰기 (오류를 삼키지 않는다) ==================== */
+
+    function failReason(err) {
+      const code = (err && (err.code || err.message) || "").toString();
+      if (/permission|PERMISSION_DENIED/i.test(code)) {
+        return AUTH.enabled
+          ? "권한이 없습니다. 강의자 계정으로 로그인했는지 확인하세요."
+          : "DB 규칙이 쓰기를 거부했습니다. Firebase 콘솔의 규칙을 확인하세요.";
+      }
+      if (/network|unavailable|disconnect/i.test(code)) return "네트워크를 확인하세요.";
+      return "잠시 후 다시 시도해 주세요.";
+    }
+
+    // 모든 쓰기는 이 함수를 통과한다. 조용히 실패하는 경로를 남기지 않기 위해서다.
+    async function write(promise, what) {
+      if (!online) { showToast(`${what} 실패`, "서버에 연결되어 있지 않습니다.", true); return false; }
+      try { await promise; return true; }
+      catch (err) { showToast(`${what} 실패`, failReason(err), true); return false; }
+    }
+
+    /* ================================ 인증 UI =============================== */
+
+    // '숨기기'가 실제로 무엇을 하는지 강의자 화면에 적어 둔다.
+    // 비밀번호 방식에서는 숨긴 글도 수강생 브라우저로 전송된 뒤 화면에서만 빠진다.
+    // 이 사실을 README에만 적어 두면 아무도 읽지 않는다.
+    // 아직 messages/ 에 남아 있는 옛 숨김 글 — 이게 있는 동안은 화면에서만 가려진 상태다.
+    // 안내문과 migrateHidden 이 반드시 같은 기준을 보도록 정의를 한 곳에 둔다.
+    // (본문이 빈 레코드는 규칙이 거부해 옮길 수 없고, 보일 내용도 없으므로 세지 않는다)
+    const legacyHidden = () => Object.entries(liveMessages)
+      .filter(([, v]) => !!v && !!v.hidden && typeof v.text === "string" && v.text.trim() !== "");
+    const hasLegacyHidden = () => legacyHidden().length > 0;
+
+    function renderHideNote() {
+      const el = document.getElementById("hideNote");
+      if (!el) return;
+      let text, danger = false;
+      if (!AUTH.enabled) {
+        text = "· 숨긴 글도 수강생 기기로 전송됩니다 (화면에서만 가려짐)";
+      } else if (setupPending()) {
+        text = "· 설정 미완료: 아래 uid를 index.html과 DB 규칙에 넣으세요";
+        danger = true;
+      } else if (!firstSnap.messages) {
+        text = "· 확인 중…";        // 아직 모른다 — 모르는 채로 안심시키지 않는다
+      } else if (hasLegacyHidden()) {
+        // 여기서 "전송되지 않습니다"라고 하면 거짓말이 된다 — 아직 옮기는 중이다
+        text = "· 옛 숨김 글을 옮기는 중입니다. 완료 전까지는 화면에서만 가려집니다";
+        danger = true;
+      } else {
+        text = "· 숨긴 글은 수강생에게 전송되지 않습니다";
+      }
+      el.textContent = text;
+      el.style.color = danger ? "var(--danger)" : "var(--muted)";
+    }
+
+    function renderAuthArea() {
+      authAreaEl.textContent = "";
+      if (!AUTH.enabled || !auth) return;
+
+      if (!currentUser) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn-primary button";
+        b.textContent = "Google로 로그인";
+        b.addEventListener("click", signIn);
+        authAreaEl.appendChild(b);
+        return;
+      }
+
+      const who = document.createElement("span");
+      who.textContent = (currentUser.email || currentUser.uid) + " ";
+      const out = document.createElement("button");
+      out.type = "button";
+      out.textContent = "로그아웃";
+      out.addEventListener("click", () => {
+        authMod.signOut(auth).catch(err => showToast("로그아웃 실패", failReason(err), true));
+      });
+      authAreaEl.append(who, out);
+
+      // ownerUid를 아직 안 채운 상태 — 여기서 uid를 알려 주고 복사하게 한다.
+      if (!AUTH.ownerUid) {
+        const box = document.createElement("div");
+        box.className = "uid-box";
+        box.textContent = "이 계정의 uid: " + currentUser.uid;
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.textContent = "uid 복사";
+        copy.style.marginTop = "0.4rem";
+        copy.addEventListener("click", () => copyText(currentUser.uid));
+        authAreaEl.append(box, copy);
+      }
+    }
+
+    async function signIn() {
+      const m = authMod;
+      try {
+        await m.signInWithPopup(auth, new m.GoogleAuthProvider());
+      } catch (err) {
+        // 팝업이 막히는 환경(사내망·일부 모바일)에서는 리디렉션으로 넘어간다.
+        if (/popup/i.test((err && err.code) || "")) {
+          try { await m.signInWithRedirect(auth, new m.GoogleAuthProvider()); return; } catch (e2) {}
+        }
+        showToast("로그인 실패", failReason(err), true);
+      }
+    }
+
+    /* ================================== 모드 =============================== */
+
     const pwDialogEl = document.getElementById("pwDialog");
     const pwFormEl = document.getElementById("pwForm");
     const pwInputEl = document.getElementById("pwInput");
@@ -820,7 +1429,6 @@
       pwInputEl.focus();
     }
     document.getElementById("pwCancel").addEventListener("click", () => pwDialogEl.close());
-    // 닫힐 때 입력값을 남기지 않는다 (다음에 열었을 때 잔상 방지)
     pwDialogEl.addEventListener("close", () => { pwInputEl.value = ""; });
 
     pwFormEl.addEventListener("submit", async (e) => {
@@ -842,7 +1450,6 @@
         pwSubmitEl.disabled = false;
         return;
       }
-      // 입력값을 DOM에 남기지 않는다 (close 이벤트 타이밍에 의존하지 않도록 명시적으로)
       pwInputEl.value = "";
       pwErrorEl.textContent = "";
       pwDialogEl.close();
@@ -851,7 +1458,18 @@
       applyMode();
     });
 
-    function enterTeacher() { openPasswordDialog(); }
+    function enterTeacher() {
+      // Google 로그인 방식이면 비밀번호를 묻지 않는다 — 로그인 여부가 곧 권한이다.
+      if (AUTH.enabled) {
+        if (!currentUser) { pendingTeacher = true; signIn(); return; }
+        if (!canTeach()) { notify("이 계정에는 강의자 권한이 없습니다."); return; }
+        mode = "teacher";
+        location.hash = "teacher";
+        applyMode();
+        return;
+      }
+      openPasswordDialog();
+    }
     function exitTeacher() {
       mode = "student";
       editingId = null;
@@ -861,12 +1479,16 @@
     function applyMode() {
       const teacher = mode === "teacher";
       composerEl.classList.toggle("hidden", !teacher);
+      teacherBarEl.classList.toggle("hidden", !teacher);
       profileEditorEl.classList.toggle("hidden", !teacher);
       modeToggle.textContent = teacher ? "수강생 화면으로" : "강의자 모드";
       titleEl.textContent = teacher ? "강의 보드 · 강의자" : "강의 보드";
-      if (teacher) { fillProfileInputs(); syncComposerCategory(); }
+      roomNameEl.textContent = ROOM;
+      if (teacher) { fillProfileInputs(); syncComposerCategory(); renderAuthArea(); renderHideNote(); }
       renderClassBar();
-      render();
+      // render()를 직접 부르면 첫 그리기 관문을 건너뛴다 — applyMode는
+      // onAuthStateChanged에서도 불리므로, state 스냅샷 전에 필터 없는 목록이 스칠 수 있다.
+      scheduleRender();
     }
     modeToggle.addEventListener("click", () => (mode === "teacher" ? exitTeacher() : enterTeacher()));
 
@@ -880,48 +1502,55 @@
       const c = categories.find(x => x.id === id);
       return c ? c.name : "";
     }
-    function addCategory() {
-      if (!configured) return alert("Firebase 설정이 필요합니다. README.md를 확인하세요.");
-      const name = (window.prompt("추가할 수업 종류의 이름을 입력하세요") || "").trim();
+    async function addCategory() {
+      if (!online) return notify("Firebase에 연결되어 있지 않습니다.");
+      const raw = await askText("수업 추가", "추가할 수업 종류의 이름을 입력하세요.", "");
+      if (raw === null) return;
+      const name = raw.trim();
       if (!name) return;
-      if (categories.some(c => c.name === name)) return alert("같은 이름의 수업 종류가 이미 있습니다.");
-      const now = Date.now();
-      const created = push(categoriesRef, { name, createdAt: now, order: now });
-      setActiveCategory(created.key);   // 새로 만든 수업을 바로 선택
+      if (categories.some(c => c.name === name)) return notify("같은 이름의 수업 종류가 이미 있습니다.");
+      const now = nowMs();
+      const created = fb.push(categoriesRef, { name, createdAt: now, order: now });
+      if (await write(created, "수업 추가")) setActiveCategory(created.key);
     }
-    function renameCategory(id) {
+    async function renameCategory(id) {
       const c = categories.find(x => x.id === id);
       if (!c) return;
-      const name = (window.prompt("수업 종류 이름을 수정하세요", c.name) || "").trim();
+      const raw = await askText("수업 이름 변경", "새 이름을 입력하세요.", c.name);
+      if (raw === null) return;
+      const name = raw.trim();
       if (!name || name === c.name) return;
-      if (categories.some(x => x.id !== id && x.name === name)) return alert("같은 이름의 수업 종류가 이미 있습니다.");
-      update(ref(db, `${CATEGORIES_PATH}/${id}`), { name });
+      if (categories.some(x => x.id !== id && x.name === name)) return notify("같은 이름의 수업 종류가 이미 있습니다.");
+      write(fb.update(fb.ref(db, `${CATEGORIES_PATH}/${id}`), { name }), "이름 변경");
     }
-    function deleteCategory(id) {
+    async function deleteCategory(id) {
       const c = categories.find(x => x.id === id);
       if (!c) return;
       const affected = messages.filter(m => m.categoryId === id);
       const msg = affected.length
         ? `'${c.name}' 수업 종류를 삭제할까요?\n이 수업의 글 ${affected.length}개는 삭제되지 않고 '미분류'로 이동합니다.`
         : `'${c.name}' 수업 종류를 삭제할까요?`;
-      if (!confirm(msg)) return;
+      if (!await askConfirm("수업 삭제", msg, "삭제", true)) return;
+
       if (affected.length) {
+        // 글의 소속을 먼저 비운다. 이게 실패하면 수업을 지우지 않는다 —
+        // 순서를 뒤집으면 어느 수업에도 속하지 않은 유령 글이 남는다.
         const updates = {};
-        affected.forEach(m => { updates[`${m.id}/categoryId`] = ""; });
-        update(messagesRef, updates);
+        affected.forEach(m => { updates[`${segOf(m)}/${m.id}/categoryId`] = ""; });
+        if (!await write(fb.update(baseRef, updates), "글 이동")) return;
       }
-      remove(ref(db, `${CATEGORIES_PATH}/${id}`));
-      setActiveCategory("");
+      if (await write(fb.remove(fb.ref(db, `${CATEGORIES_PATH}/${id}`)), "수업 삭제")) {
+        setActiveCategory("");
+      }
     }
-    // 선택된 수업은 DB에 저장 → 수강생 화면도 같은 수업만 보게 됨
     function setActiveCategory(id) {
-      if (!configured) return;
-      update(stateRef, { activeCategory: id || "" });
+      if (!online) return;
+      write(fb.update(stateRef, { activeCategory: id || "" }), "수업 선택");
     }
-    // 강의자 화면의 수업 종류 바 / 수강생 화면의 현재 수업 표시
+
     function renderClassBar() {
       const teacher = mode === "teacher";
-      classBarEl.innerHTML = "";
+      classBarEl.textContent = "";
 
       if (!teacher) {
         const name = categoryName(activeCategory);
@@ -973,9 +1602,9 @@
       }
       classBarEl.appendChild(tools);
     }
-    // select 요소에 '미분류' + 수업 종류 목록 채우기
+
     function fillCategorySelect(sel, value) {
-      sel.innerHTML = "";
+      sel.textContent = "";
       const none = document.createElement("option");
       none.value = "";
       none.textContent = "미분류";
@@ -988,74 +1617,150 @@
       });
       sel.value = categories.some(c => c.id === value) ? value : "";
     }
-    // 작성창의 수업 선택: 선택된 수업이 바뀌면 그 수업으로 따라가고, 그 외엔 강의자 선택을 유지
+
     let composerSyncedTo = null;
     function syncComposerCategory() {
-      // 선택된 수업이 아직 목록에 안 들어온 상태(초기 로딩)에서는 동기화를 미룬다
       const known = !activeCategory || categories.some(c => c.id === activeCategory);
       const follow = known && composerSyncedTo !== activeCategory;
       if (known) composerSyncedTo = activeCategory;
       fillCategorySelect(msgCategoryEl, follow ? activeCategory : msgCategoryEl.value);
     }
 
-    // ---- Data ops ----
+    /* ================================ 데이터 =============================== */
+
+    // 글이 지금 어느 경로에 있는지. Google 로그인 방식에서는 숨긴 글이 drafts에 있다.
+    const segOf = (m) => m.seg || "messages";
+    const pathOf = (m) => `${BASE}/${segOf(m)}`;
+    // 핸들러가 붙잡아 둔 옛 m 을 넘겨도 안전하도록 항상 현재 레코드로 다시 푼다.
+    // 이전(messages→drafts) 직후가 정확히 그런 경우다: seg 는 바뀌었는데 hidden 은 그대로라
+    // 버블이 재사용되고, 닫아 둔 m 은 옛 경로를 가리킨 채 남는다.
+    const byId = (id) => messages.find(m => m.id === id);
+    const msgRef = (m) => {
+      const cur = byId(m.id) || m;
+      return fb.ref(db, `${pathOf(cur)}/${cur.id}`);
+    };
+
     function saveMessage() {
-      if (!configured) return alert("Firebase 설정이 필요합니다. README.md를 확인하세요.");
+      if (!online) return notify("Firebase에 연결되어 있지 않습니다.");
       const text = inputEl.value.trim();
       if (!text) return;
-      const now = Date.now();
-      const categoryId = msgCategoryEl.value || "";
-      push(messagesRef, { text, createdAt: now, updatedAt: now, hidden: false, order: now, categoryId });
+      if (text.length > 4000) {
+        return notify(`글이 너무 깁니다 (${text.length}자). 4000자 이하로 나눠서 올려 주세요.`);
+      }
+      const now = nowMs();
+      const payload = {
+        text,
+        createdAt: now,
+        updatedAt: now,
+        hidden: false,
+        order: now,
+        code: !!msgCodeEl.checked,
+        categoryId: msgCategoryEl.value || ""
+      };
+      // 입력창은 바로 비운다 — 연속 입력을 막지 않기 위해서다.
+      // 대신 실패하면 원문을 되돌려 놓는다. 글이 조용히 사라지는 경로를 없앤다.
       inputEl.value = "";
+      msgCodeEl.checked = false;
       inputEl.focus();
+      write(fb.push(messagesRef, payload), "저장").then(ok => {
+        if (!ok && !inputEl.value.trim()) {
+          inputEl.value = text;
+          msgCodeEl.checked = payload.code;
+        }
+      });
     }
+
     function setMessageCategory(id, categoryId) {
-      update(ref(db, `${DB_PATH}/${id}`), { categoryId: categoryId || "" });
+      const m = byId(id);
+      if (!m) return;
+      write(fb.update(msgRef(m), { categoryId: categoryId || "" }), "수업 변경");
     }
     function updateText(id, text) {
-      update(ref(db, `${DB_PATH}/${id}`), { text, updatedAt: Date.now() });
+      const m = byId(id);
+      if (!m) return;
+      write(fb.update(msgRef(m), { text, updatedAt: nowMs() }), "수정");
     }
+    function setCode(id, code) {
+      const m = byId(id);
+      if (!m) return;
+      write(fb.update(msgRef(m), { code: !!code }), "표시 방식 변경");
+    }
+
+    // 숨기기 = 수강생에게 안 보이게 하기.
+    // Google 로그인 방식에서는 글을 drafts로 '옮긴다' — 그래야 수강생 브라우저로
+    // 아예 전송되지 않는다. 비밀번호 방식에서는 예전처럼 hidden 플래그만 세운다
+    // (이 경우 숨긴 글은 여전히 수강생에게 전송되고 화면에서만 걸러진다).
     function setHidden(id, hidden) {
-      update(ref(db, `${DB_PATH}/${id}`), { hidden });
+      const m = byId(id);
+      if (!m) return;
+      if (!AUTH.enabled) {
+        write(fb.update(fb.ref(db, `${DB_PATH}/${id}`), { hidden }), hidden ? "숨기기" : "보이기");
+        return;
+      }
+      const data = {
+        text: m.text, createdAt: m.createdAt, updatedAt: m.updatedAt,
+        order: m.order, code: !!m.code, categoryId: m.categoryId || "", hidden: !!hidden
+      };
+      const from = segOf(m);
+      const to = hidden ? "drafts" : "messages";
+      const updates = { [`${to}/${id}`]: data };
+      if (from !== to) updates[`${from}/${id}`] = null;
+      write(fb.update(baseRef, updates), hidden ? "숨기기" : "보이기");
     }
-    function deleteMessage(id) {
-      if (!confirm("이 글을 삭제할까요?")) return;
-      remove(ref(db, `${DB_PATH}/${id}`));
+
+    async function deleteMessage(id) {
+      const m = byId(id);
+      if (!m) return;
+      if (!await askConfirm("글 삭제", "이 글을 삭제할까요?", "삭제", true)) return;
+      write(fb.remove(msgRef(m)), "삭제");
     }
-    // 일괄 숨기기/보이기는 지금 선택된 수업의 글에만 적용
+
     function setAllHidden(hidden) {
-      const targets = messages.filter(matchesActiveCategory);
+      const targets = messages.filter(matchesActiveCategory).filter(m => !!m.hidden !== !!hidden);
       if (!targets.length) return;
+      if (!AUTH.enabled) {
+        const updates = {};
+        targets.forEach(m => { updates[`${m.id}/hidden`] = hidden; });
+        write(fb.update(messagesRef, updates), hidden ? "모두 숨기기" : "모두 보이기");
+        return;
+      }
       const updates = {};
-      targets.forEach(m => { updates[`${m.id}/hidden`] = hidden; });
-      update(messagesRef, updates);
+      const to = hidden ? "drafts" : "messages";
+      targets.forEach(m => {
+        const from = segOf(m);
+        if (from !== to) updates[`${from}/${m.id}`] = null;
+        updates[`${to}/${m.id}`] = {
+          text: m.text, createdAt: m.createdAt, updatedAt: m.updatedAt,
+          order: m.order, code: !!m.code, categoryId: m.categoryId || "", hidden: !!hidden
+        };
+      });
+      write(fb.update(baseRef, updates), hidden ? "모두 숨기기" : "모두 보이기");
     }
-    // activeCategory가 ""(전체)면 모두 통과, 아니면 해당 수업의 글만
+
     function matchesActiveCategory(m) {
       return !activeCategory || m.categoryId === activeCategory;
     }
-    // 현재 화면에 실제로 보이는 목록 (모드 + 선택된 수업 기준, 정렬 완료)
     function visibleMessages() {
       const teacher = mode === "teacher";
       return sortMessages(messages.filter(m => (teacher || !m.hidden) && matchesActiveCategory(m)));
     }
-    // 정렬 기준값(order 없으면 createdAt로 대체)
     function effOrder(m) {
       return (m.order !== undefined && m.order !== null) ? m.order : m.createdAt;
     }
-    // dir: -1 = 위로, +1 = 아래로 (현재 보이는 목록 기준으로 이웃과 order 교환)
     function moveMessage(id, dir) {
       const sorted = visibleMessages();
       const i = sorted.findIndex(m => m.id === id);
       const j = i + dir;
       if (i < 0 || j < 0 || j >= sorted.length) return;
       const a = sorted[i], b = sorted[j];
-      update(messagesRef, {
-        [`${a.id}/order`]: effOrder(b),
-        [`${b.id}/order`]: effOrder(a)
-      });
+      // order가 같으면 자리를 바꿔도 아무 일이 없다 — 그럴 땐 살짝 벌려 준다.
+      const oa = effOrder(a), ob = effOrder(b);
+      const na = oa === ob ? ob + (dir < 0 ? 1 : -1) : ob;
+      const updates = {};
+      updates[`${segOf(a)}/${a.id}/order`] = na;
+      updates[`${segOf(b)}/${b.id}/order`] = oa;
+      write(fb.update(baseRef, updates), "순서 변경");
     }
-    // 최신/상단 우선(order 내림차순), 동률이면 createdAt·id로 안정 정렬
     function sortMessages(arr) {
       return [...arr].sort((a, b) =>
         (effOrder(b) - effOrder(a)) ||
@@ -1070,31 +1775,133 @@
     inputEl.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") saveMessage();
     });
+    // 붙여넣은 내용이 코드처럼 보이면 '코드로 표시'를 미리 켜 준다 (끄면 다시 안 켠다).
+    let codeAutoTouched = false;
+    msgCodeEl.addEventListener("change", () => { codeAutoTouched = true; });
+    inputEl.addEventListener("input", () => {
+      if (codeAutoTouched) return;
+      msgCodeEl.checked = looksLikeCode(inputEl.value);
+    });
 
-    // ---- Profile ----
+    /* =============================== 내보내기/불러오기 ====================== */
+
+    function exportBoard() {
+      const data = {
+        format: "lecture-board/v1",
+        room: ROOM,
+        exportedAt: new Date().toISOString(),
+        categories: sortCategories(categories).map(c => ({ id: c.id, name: c.name, order: c.order })),
+        messages: sortMessages(messages).map(m => ({
+          text: m.text, hidden: !!m.hidden, code: !!m.code,
+          categoryId: m.categoryId || "", order: m.order,
+          createdAt: m.createdAt, updatedAt: m.updatedAt
+        }))
+      };
+      const stamp = new Date().toISOString().slice(0, 10);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `lecture-board-${ROOM}-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast("내보냈습니다", `글 ${data.messages.length}개 · 수업 ${data.categories.length}개`);
+    }
+
+    async function importBoard(file) {
+      if (!online) return notify("Firebase에 연결되어 있지 않습니다.");
+      let data;
+      try { data = JSON.parse(await file.text()); }
+      catch { return notify("JSON 파일을 읽을 수 없습니다."); }
+      if (!data || data.format !== "lecture-board/v1" || !Array.isArray(data.messages)) {
+        return notify("이 앱에서 내보낸 파일이 아닙니다.");
+      }
+      const ok = await askConfirm(
+        "불러오기",
+        `글 ${data.messages.length}개, 수업 ${(data.categories || []).length}개를 이 보드('${ROOM}')에 추가합니다.\n` +
+        "지금 있는 글은 지워지지 않고 그대로 남습니다.",
+        "추가"
+      );
+      if (!ok) return;
+
+      // 같은 이름의 수업은 다시 만들지 않고 재사용한다.
+      const idMap = {};
+      for (const c of (data.categories || [])) {
+        const existing = categories.find(x => x.name === c.name);
+        if (existing) { idMap[c.id] = existing.id; continue; }
+        const now = nowMs();
+        const created = fb.push(categoriesRef, { name: c.name, createdAt: now, order: c.order || now });
+        if (!await write(created, "수업 불러오기")) return;
+        idMap[c.id] = created.key;
+      }
+
+      // 숨긴 글은 숨긴 채로 들어가야 한다.
+      // Google 로그인 방식에서는 그게 곧 drafts 경로다 — 여기서 보이게 넣어 버리면
+      // 감춰 두려던 내용이 불러오는 순간 수강생 화면에 뜬다.
+      const updates = {};
+      let base = nowMs();
+      let n = 0;
+      for (const m of data.messages) {
+        if (typeof m.text !== "string" || !m.text.trim()) continue;
+        const hidden = !!m.hidden;
+        const seg = (AUTH.enabled && hidden) ? "drafts" : "messages";
+        const key = fb.push(fb.ref(db, `${BASE}/${seg}`)).key;
+        updates[`${seg}/${key}`] = {
+          text: m.text,
+          createdAt: m.createdAt || base,
+          updatedAt: m.updatedAt || m.createdAt || base,
+          hidden,
+          order: (base -= 1),
+          code: !!m.code,
+          categoryId: idMap[m.categoryId] || ""
+        };
+        n++;
+      }
+      if (!n) return notify("가져올 글이 없습니다.");
+      if (await write(fb.update(baseRef, updates), "불러오기")) {
+        const hid = data.messages.filter(m => m.hidden).length;
+        showToast("불러왔습니다", `글 ${n}개 추가` + (hid ? ` (숨김 ${hid}개 포함)` : ""));
+      }
+    }
+
+    document.getElementById("exportBtn").addEventListener("click", exportBoard);
+    const importFileEl = document.getElementById("importFile");
+    document.getElementById("importBtn").addEventListener("click", () => importFileEl.click());
+    importFileEl.addEventListener("change", () => {
+      const f = importFileEl.files && importFileEl.files[0];
+      importFileEl.value = "";
+      if (f) importBoard(f).catch(err => showToast("불러오기 실패", failReason(err), true));
+    });
+
+    /* ================================ 프로필 =============================== */
+
     function fillProfileInputs() {
-      // 편집 중(포커스)인 칸은 덮어쓰지 않음
       if (document.activeElement !== pfNameEl) pfNameEl.value = profile.name || "";
       if (document.activeElement !== pfAffiliationEl) pfAffiliationEl.value = profile.affiliation || "";
       if (document.activeElement !== pfContactEl) pfContactEl.value = profile.contact || "";
     }
-    function saveProfile() {
-      if (!configured) return alert("Firebase 설정이 필요합니다. README.md를 확인하세요.");
-      update(profileRef, {
+    async function saveProfile() {
+      if (!online) return notify("Firebase에 연결되어 있지 않습니다.");
+      const btn = document.getElementById("pfSaveBtn");
+      const original = "프로필 저장";
+      // 버튼을 비활성화하지 않는다 — 오프라인이면 쓰기 프로미스가 거부되지 않고
+      // 계속 대기하므로, 여기에 묶으면 재연결까지 버튼이 죽는다.
+      // 같은 값을 두 번 써도 결과가 같으니 중복 클릭도 문제가 없다.
+      btn.textContent = "저장 중…";
+      const ok = await write(fb.update(profileRef, {
         name: pfNameEl.value.trim(),
         affiliation: pfAffiliationEl.value.trim(),
         contact: pfContactEl.value.trim()
-      });
-      const btn = document.getElementById("pfSaveBtn");
-      const original = btn.textContent;
-      btn.textContent = "저장됨";
-      btn.disabled = true;
-      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1000);
+      }), "프로필 저장");
+      btn.textContent = ok ? "저장됨" : original;
+      setTimeout(() => { btn.textContent = original; }, 1200);
     }
     function renderProfile() {
       const has = !!(profile.name || profile.affiliation || profile.contact);
       profileCardEl.classList.toggle("hidden", !has);
-      profileCardEl.innerHTML = "";
+      profileCardEl.textContent = "";
       if (!has) return;
       if (profile.name) {
         const d = document.createElement("div");
@@ -1132,45 +1939,40 @@
       pfToggleEl.setAttribute("aria-expanded", String(!collapsed));
     });
 
-    // ---- Clipboard + 복사 완료 토스트 ----
-    const toastEl = document.getElementById("toast");
-    const toastPreviewEl = document.getElementById("toastPreview");
-    let toastTimer = null;
-
-    function showToast(text) {
-      // 고정 문구만 스크린리더에 읽히고, 미리보기는 aria-hidden으로 눈에만 보인다.
-      toastPreviewEl.textContent = text;
-      toastEl.classList.add("is-visible");
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(hideToast, 2400);
-    }
-    function hideToast() {
-      clearTimeout(toastTimer);
-      toastEl.classList.remove("is-visible");
-    }
+    /* =============================== 클립보드 ============================== */
 
     async function copyText(text) {
+      let ok = false;
       try {
         await navigator.clipboard.writeText(text);
+        ok = true;
       } catch {
         const ta = document.createElement("textarea");
-        ta.value = text; document.body.appendChild(ta); ta.select();
-        try { document.execCommand("copy"); } catch {}
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try { ok = document.execCommand("copy"); } catch { ok = false; }
         document.body.removeChild(ta);
       }
-      showToast(text);
+      // 실패했는데 성공했다고 말하지 않는다 — 수강생이 빈 클립보드로 붙여넣게 된다.
+      if (ok) showToast("복사되었습니다", text);
+      else showToast("복사하지 못했습니다", "글을 직접 드래그해서 복사해 주세요.", true);
+      return ok;
     }
 
-    // ---- Time formatting ----
+    /* ================================ 시간 ================================= */
+
     const pad2 = (n) => String(n).padStart(2, "0");
-    // 강의자용 절대시간: MM-DD HH:MM
     function formatAbsolute(ts) {
       const d = new Date(ts);
       return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
     }
-    // 수강생용 상대시간: 최대 단위만 표기 (초/분/시간/일/월/년 전)
+    // 기준 시각은 nowMs() — 서버 시계로 보정한 값이라 기기 시계가 틀려도 어긋나지 않는다.
     function formatRelative(ts) {
-      const sec = Math.floor(Math.max(0, Date.now() - ts) / 1000);
+      const sec = Math.floor(Math.max(0, nowMs() - ts) / 1000);
       if (sec < 60) return pad2(sec) + "초 전";
       const min = Math.floor(sec / 60);
       if (min < 60) return pad2(min) + "분 전";
@@ -1179,178 +1981,110 @@
       const day = Math.floor(hr / 24);
       if (day < 30) return pad2(day) + "일 전";
       const month = Math.floor(day / 30);
-      if (month < 12) return pad2(month) + "월 전";
+      if (month < 12) return pad2(month) + "개월 전";
       return pad2(Math.floor(month / 12)) + "년 전";
     }
-    // 수강생 화면 상대시간 라벨을 주기적으로 갱신(재렌더 없이)
     function updateRelativeTimes() {
-      document.querySelectorAll('#list .time[data-rel]').forEach(el => {
-        el.textContent = formatRelative(Number(el.dataset.ts));
-      });
+      // 강의자 화면은 절대시간이라 갱신할 라벨이 아예 없다 — 그럴 땐 일하지 않는다.
+      if (mode === "teacher") return;
+      const els = listEl.querySelectorAll(".time[data-rel]");
+      if (!els.length) return;
+      els.forEach(el => { el.textContent = formatRelative(Number(el.dataset.ts)); });
     }
     setInterval(updateRelativeTimes, 1000);
 
-    // ---- Render ----
+    /* ================================ 렌더 ================================= */
+
+    // id로 노드를 재사용하는 부분 렌더링.
+    // 통째로 갈아끼우면 (1) 수강생이 드래그하던 선택이 풀리고 (2) 스크롤이 밀리고
+    // (3) 강의자가 편집 중이던 textarea가 DB 값으로 덮여 쓰던 글이 날아간다.
+    const nodeCache = new Map();   // id -> { el, sig, pos, textEl, moreBtn, numEl, upBtn, downBtn }
+
+    // 내용 서명에는 '몇 번째인가'를 넣지 않는다.
+    // 새 글이 하나 올라오면 아래 글들의 번호가 전부 밀리는데, 그때마다 버블을 다시 만들면
+    // 수강생이 드래그하던 선택이 통째로 풀린다. 번호와 ▲▼ 상태는 제자리에서 고친다.
+    function contentSig(m, teacher) {
+      // JSON 으로 만들어 필드 경계를 확실히 한다. 이어 붙이면
+      // (categoriesKey="1", text="23") 과 (categoriesKey="12", text="3") 이 같아진다.
+      return JSON.stringify([
+        teacher ? "T" : "S", m.hidden ? 1 : 0, m.code ? 1 : 0,
+        m.categoryId || "", m.updatedAt, activeCategory, categoriesKey, m.text
+      ]);
+    }
+
+    // 위치만 바뀐 버블은 번호와 ▲▼만 손본다 — 본문 DOM은 건드리지 않는다.
+    function patchPosition(entry, idx, count) {
+      const pos = idx + "/" + count;
+      if (entry.pos === pos) return;
+      entry.pos = pos;
+      if (entry.numEl) entry.numEl.textContent = String(idx + 1);
+      if (entry.upBtn) entry.upBtn.disabled = idx === 0;
+      if (entry.downBtn) entry.downBtn.disabled = idx === count - 1;
+    }
+
     function render() {
       const teacher = mode === "teacher";
-      // 수강생: 숨김 제외. 강의자: 전부. order 기준 상단 우선.
-      // 선택된 수업 종류가 있으면 양쪽 모두 그 수업의 글만.
       const visible = visibleMessages();
 
-      listEl.innerHTML = "";
+      // 편집하던 글이 사라졌으면(원격 삭제 등) 편집 상태도 같이 놓아준다
+      if (editingId && !visible.some(m => m.id === editingId)) editingId = null;
+
       emptyEl.classList.toggle("hidden", visible.length > 0);
       const activeName = categoryName(activeCategory);
       emptyEl.textContent = activeName
         ? `'${activeName}' 수업에 표시된 글이 없습니다.`
         : "아직 표시된 글이 없습니다.";
 
-      const clampTargets = [];   // [{id, textEl, moreBtn}] — 렌더 후 넘침 여부 측정
+      const clampTargets = [];
+      const seen = new Set();
 
+      // 1) 필요한 노드를 만들거나 그대로 둔다
       visible.forEach((m, idx) => {
-        const bubble = document.createElement("div");
-        bubble.className = "bubble" + (m.hidden ? " is-hidden" : "");
+        seen.add(m.id);
+        const sig = contentSig(m, teacher);
+        const cached = nodeCache.get(m.id);
 
-        // 왼쪽 순서 번호 (표시되는 목록 기준 — 수강생은 숨김 제외 후 재부여)
-        const numEl = document.createElement("div");
-        numEl.className = "num";
-        numEl.textContent = String(idx + 1);
+        // 편집 중인 버블은 무슨 일이 있어도 다시 만들지 않는다 (입력 보존)
+        if (cached && editingId === m.id && cached.editing) return;
 
-        if (teacher && editingId === m.id) {
-          bubble.classList.add("editing");
-          const ta = document.createElement("textarea");
-          ta.className = "edit-area";
-          ta.value = m.text;
-          const row = document.createElement("div");
-          row.className = "edit-row";
-          const save = document.createElement("button");
-          save.className = "btn-primary button";
-          save.textContent = "저장";
-          save.addEventListener("click", () => {
-            const v = ta.value.trim();
-            if (v) updateText(m.id, v);
-            editingId = null; render();
-          });
-          const cancel = document.createElement("button");
-          cancel.textContent = "취소";
-          cancel.addEventListener("click", () => { editingId = null; render(); });
-          row.append(save, cancel);
-          bubble.append(ta, row);
-          listEl.appendChild(bubble);
-          ta.focus();
+        if (cached && cached.sig === sig && !cached.editing) {
+          patchPosition(cached, idx, visible.length);
+          if (cached.textEl) clampTargets.push({ id: m.id, textEl: cached.textEl, moreBtn: cached.moreBtn });
           return;
         }
-
-        // 본문 + 자세히 버튼 (3줄 초과 시에만 버튼 노출)
-        const contentEl = document.createElement("div");
-        contentEl.className = "content";
-
-        const textEl = document.createElement("div");
-        textEl.className = "text clamped";
-        textEl.textContent = m.text;
-
-        const moreBtn = document.createElement("button");
-        moreBtn.type = "button";
-        moreBtn.className = "btn-more button hidden";
-        moreBtn.textContent = "자세히";
-        moreBtn.addEventListener("click", (e) => {
-          e.stopPropagation();   // 버블 클릭(복사)과 분리
-          const isExpanded = expanded.has(m.id);
-          if (isExpanded) expanded.delete(m.id); else expanded.add(m.id);
-          textEl.classList.toggle("clamped", isExpanded);
-          moreBtn.textContent = isExpanded ? "자세히" : "접기";
-        });
-
-        contentEl.append(textEl, moreBtn);
-        clampTargets.push({ id: m.id, textEl, moreBtn });
-
-        // 수업 종류: 강의자는 셀렉트로 변경, 수강생은 '전체' 상태일 때만 배지로 표시
-        const foot = document.createElement("div");
-        foot.className = "content-foot";
-        if (teacher) {
-          const catSel = document.createElement("select");
-          catSel.className = "cat-select";
-          fillCategorySelect(catSel, m.categoryId);
-          catSel.addEventListener("click", (e) => e.stopPropagation());
-          catSel.addEventListener("change", () => setMessageCategory(m.id, catSel.value));
-          foot.appendChild(catSel);
-        } else if (!activeCategory && categoryName(m.categoryId)) {
-          const tag = document.createElement("span");
-          tag.className = "cat-tag";
-          tag.textContent = categoryName(m.categoryId);
-          foot.appendChild(tag);
-        }
-        if (foot.childElementCount) contentEl.appendChild(foot);
-
-        // 버튼 왼쪽 작은 시간 표기 (강의자=절대시간, 수강생=상대시간)
-        const timeEl = document.createElement("div");
-        timeEl.className = "time";
-        if (teacher) {
-          timeEl.textContent = formatAbsolute(m.updatedAt);
-        } else {
-          timeEl.textContent = formatRelative(m.updatedAt);
-          timeEl.dataset.ts = String(m.updatedAt);
-          timeEl.dataset.rel = "1";
-        }
-
-        const actions = document.createElement("div");
-        actions.className = "actions";
-
-        if (teacher) {
-          const editBtn = document.createElement("button");
-          editBtn.textContent = "수정";
-          editBtn.addEventListener("click", () => { editingId = m.id; render(); });
-
-          const hideBtn = document.createElement("button");
-          hideBtn.textContent = m.hidden ? "보이기" : "숨기기";
-          hideBtn.addEventListener("click", () => setHidden(m.id, !m.hidden));
-
-          const delBtn = document.createElement("button");
-          delBtn.className = "btn-danger button";
-          delBtn.textContent = "삭제";
-          delBtn.addEventListener("click", () => deleteMessage(m.id));
-
-          actions.append(editBtn, hideBtn, delBtn);
-
-          // 오른쪽 위/아래 순서 변경 버튼
-          const reorder = document.createElement("div");
-          reorder.className = "reorder";
-          const upBtn = document.createElement("button");
-          upBtn.textContent = "▲";
-          upBtn.title = "위로";
-          upBtn.disabled = idx === 0;
-          upBtn.addEventListener("click", () => moveMessage(m.id, -1));
-          const downBtn = document.createElement("button");
-          downBtn.textContent = "▼";
-          downBtn.title = "아래로";
-          downBtn.disabled = idx === visible.length - 1;
-          downBtn.addEventListener("click", () => moveMessage(m.id, 1));
-          reorder.append(upBtn, downBtn);
-
-          bubble.append(numEl, contentEl, timeEl, actions, reorder);
-        } else {
-          // 복사 버튼 없음 — 버블 자체를 클릭하면 복사
-          bubble.classList.add("copyable");
-          bubble.title = "클릭하면 복사됩니다";
-          bubble.addEventListener("click", () => {
-            // 텍스트를 직접 선택(드래그)한 경우엔 복사 동작을 건너뜀
-            const sel = window.getSelection();
-            if (sel && !sel.isCollapsed && bubble.contains(sel.anchorNode)) return;
-            copyText(m.text);
-          });
-
-          bubble.append(numEl, contentEl, timeEl);
-        }
-
-        listEl.appendChild(bubble);
+        if (cached && cached.el.parentNode === listEl) listEl.removeChild(cached.el);
+        const built = buildBubble(m, idx, visible.length, teacher);
+        built.sig = sig;
+        built.pos = idx + "/" + visible.length;
+        nodeCache.set(m.id, built);
+        if (built.textEl) clampTargets.push({ id: m.id, textEl: built.textEl, moreBtn: built.moreBtn });
       });
 
-      // 붙인 직후 동기 측정 — 3줄을 넘칠 때만 '자세히' 노출, 펼쳐둔 항목은 상태 복원.
-      // (rAF를 쓰면 탭이 백그라운드일 때 프레임이 안 와서 버튼이 안 나타남)
+      // 2) 사라진 노드를 정리한다
+      nodeCache.forEach((entry, id) => {
+        if (seen.has(id)) return;
+        if (entry.el.parentNode === listEl) listEl.removeChild(entry.el);
+        nodeCache.delete(id);
+        // 목록에서 정말 없어진 글만 펼침 상태를 버린다.
+        // 수업 필터로 잠깐 빠진 것까지 지우면 돌아왔을 때 전부 접혀 있다.
+        if (!messages.some(m => m.id === id)) expanded.delete(id);
+      });
+
+      // 3) 순서만 맞춘다. 이미 제자리인 노드는 건드리지 않는다.
+      let cursor = listEl.firstChild;
+      visible.forEach(m => {
+        const el = nodeCache.get(m.id).el;
+        if (el === cursor) { cursor = cursor.nextSibling; return; }
+        listEl.insertBefore(el, cursor);
+      });
+      while (cursor) {
+        const next = cursor.nextSibling;
+        listEl.removeChild(cursor);
+        cursor = next;
+      }
+
       applyClamp(clampTargets);
-      // 웹폰트가 늦게 적용되면 줄 수가 달라질 수 있어 한 번 더 측정
       const token = ++renderToken;
-      // Pretendard dynamic-subset은 unicode-range별 지연 로드라 첫 렌더 시점에
-      // fonts.status가 "loaded"로 읽힐 수 있다. 조건 없이 항상 재측정한다.
       if (document.fonts) {
         document.fonts.ready.then(() => {
           if (token === renderToken) applyClamp(clampTargets);
@@ -1358,11 +2092,213 @@
       }
     }
 
+    function buildBubble(m, idx, count, teacher) {
+      const bubble = document.createElement("div");
+      bubble.className = "bubble" + (m.hidden ? " is-hidden" : "");
+
+      const numEl = document.createElement("div");
+      numEl.className = "num";
+      numEl.textContent = String(idx + 1);
+
+      // ---- 편집 중 ----
+      if (teacher && editingId === m.id) {
+        bubble.classList.add("editing");
+        const ta = document.createElement("textarea");
+        ta.className = "edit-area";
+        ta.value = m.text;
+        const row = document.createElement("div");
+        row.className = "edit-row";
+        const save = document.createElement("button");
+        save.className = "btn-primary button";
+        save.textContent = "저장";
+        save.addEventListener("click", () => {
+          const v = ta.value.trim();
+          if (v && v !== m.text) updateText(m.id, v);
+          editingId = null;
+          nodeCache.delete(m.id);
+          if (bubble.parentNode === listEl) listEl.removeChild(bubble);
+          render();
+        });
+        const cancel = document.createElement("button");
+        cancel.textContent = "취소";
+        cancel.addEventListener("click", () => {
+          editingId = null;
+          nodeCache.delete(m.id);
+          if (bubble.parentNode === listEl) listEl.removeChild(bubble);
+          render();
+        });
+        row.append(save, cancel);
+        bubble.append(ta, row);
+        queueMicrotask(() => ta.focus());
+        return { el: bubble, editing: true, textEl: null, moreBtn: null,
+                 numEl: null, upBtn: null, downBtn: null };
+      }
+
+      // ---- 본문 ----
+      const contentEl = document.createElement("div");
+      contentEl.className = "content";
+
+      const textEl = document.createElement("div");
+      textEl.className = "text clamped" + (m.code ? " code" : "");
+      if (m.code) renderCode(textEl, m.text);
+      else textEl.textContent = m.text;
+
+      const moreBtn = document.createElement("button");
+      moreBtn.type = "button";
+      moreBtn.className = "btn-more button hidden";
+      moreBtn.textContent = "자세히";
+      moreBtn.setAttribute("aria-expanded", "false");
+      moreBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isExpanded = expanded.has(m.id);
+        if (isExpanded) expanded.delete(m.id); else expanded.add(m.id);
+        textEl.classList.toggle("clamped", isExpanded);
+        moreBtn.textContent = isExpanded ? "자세히" : "접기";
+        moreBtn.setAttribute("aria-expanded", String(!isExpanded));
+      });
+
+      contentEl.append(textEl, moreBtn);
+
+      const foot = document.createElement("div");
+      foot.className = "content-foot";
+      if (teacher) {
+        const catSel = document.createElement("select");
+        catSel.className = "cat-select";
+        catSel.setAttribute("aria-label", "수업 종류");
+        fillCategorySelect(catSel, m.categoryId);
+        catSel.addEventListener("click", (e) => e.stopPropagation());
+        catSel.addEventListener("change", () => setMessageCategory(m.id, catSel.value));
+        foot.appendChild(catSel);
+      } else {
+        if (!activeCategory && categoryName(m.categoryId)) {
+          const tag = document.createElement("span");
+          tag.className = "cat-tag";
+          tag.textContent = categoryName(m.categoryId);
+          foot.appendChild(tag);
+        }
+        if (m.code) {
+          const tag = document.createElement("span");
+          tag.className = "code-tag";
+          tag.textContent = "CODE";
+          foot.appendChild(tag);
+        }
+      }
+      if (foot.childElementCount) contentEl.appendChild(foot);
+
+      const timeEl = document.createElement("div");
+      timeEl.className = "time";
+      if (teacher) {
+        timeEl.textContent = formatAbsolute(m.updatedAt);
+      } else {
+        timeEl.textContent = formatRelative(m.updatedAt);
+        timeEl.dataset.ts = String(m.updatedAt);
+        timeEl.dataset.rel = "1";
+      }
+
+      let upBtn = null, downBtn = null;
+
+      if (teacher) {
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "수정";
+        editBtn.addEventListener("click", async () => {
+          if (switchingEdit) return;       // 확인 대화가 떠 있는 동안의 중복 클릭
+          // 다른 글을 고치는 중이었다면 먼저 물어본다 — 말없이 버리지 않는다.
+          if (editingId && editingId !== m.id) {
+            const prev = nodeCache.get(editingId);
+            const ta = prev && prev.el.querySelector(".edit-area");
+            const other = byId(editingId);
+            if (ta && other && ta.value !== other.text) {
+              switchingEdit = true;
+              let go = false;
+              try {
+                go = await askConfirm("수정 중인 글이 있습니다",
+                  "다른 글을 수정하고 있습니다. 저장하지 않은 내용은 사라집니다.", "버리고 이동", true);
+              } finally { switchingEdit = false; }
+              if (!go) return;
+            }
+            const stale = editingId;
+            editingId = null;
+            const e = nodeCache.get(stale);
+            if (e && e.el.parentNode === listEl) listEl.removeChild(e.el);
+            nodeCache.delete(stale);
+          }
+          editingId = m.id;
+          nodeCache.delete(m.id);
+          if (bubble.parentNode === listEl) listEl.removeChild(bubble);
+          render();
+        });
+
+        const codeBtn = document.createElement("button");
+        codeBtn.textContent = m.code ? "일반체" : "코드";
+        codeBtn.title = m.code ? "일반 글로 표시" : "코드로 표시 (구문 강조·들여쓰기 색)";
+        codeBtn.addEventListener("click", () => setCode(m.id, !m.code));
+
+        const hideBtn = document.createElement("button");
+        hideBtn.textContent = m.hidden ? "보이기" : "숨기기";
+        hideBtn.addEventListener("click", () => setHidden(m.id, !m.hidden));
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn-danger button";
+        delBtn.textContent = "삭제";
+        delBtn.addEventListener("click", () => deleteMessage(m.id));
+
+        actions.append(editBtn, codeBtn, hideBtn, delBtn);
+
+        const reorder = document.createElement("div");
+        reorder.className = "reorder";
+        upBtn = document.createElement("button");
+        upBtn.textContent = "▲";
+        upBtn.title = "위로";
+        upBtn.setAttribute("aria-label", "위로 옮기기");
+        upBtn.disabled = idx === 0;
+        upBtn.addEventListener("click", () => moveMessage(m.id, -1));
+        downBtn = document.createElement("button");
+        downBtn.textContent = "▼";
+        downBtn.title = "아래로";
+        downBtn.setAttribute("aria-label", "아래로 옮기기");
+        downBtn.disabled = idx === count - 1;
+        downBtn.addEventListener("click", () => moveMessage(m.id, 1));
+        reorder.append(upBtn, downBtn);
+
+        bubble.append(numEl, contentEl, timeEl, actions, reorder);
+      } else {
+        // 수강생 화면: 버블 자체가 복사 버튼이다.
+        // 마우스만이 아니라 키보드로도 같은 일을 할 수 있어야 한다.
+        bubble.classList.add("copyable");
+        bubble.title = "클릭하면 복사됩니다";
+        // 드래그로 글자를 고르고 있었다면 복사 동작을 건너뛴다
+        bubble.addEventListener("click", (e) => {
+          if (e.target.closest("button")) return;
+          const sel = window.getSelection();
+          if (sel && !sel.isCollapsed && bubble.contains(sel.anchorNode)) return;
+          copyText(m.text);
+        });
+
+        // 진짜 버튼. 키보드·스크린리더가 쓰는 경로이자, 마우스 사용자에게도
+        // "여기를 누르면 복사된다"는 표시가 된다.
+        const copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "btn-copy button";
+        copyBtn.textContent = "복사";
+        // 목록에 복사 버튼이 여러 개다 — 이름이 전부 "복사"면 보조기기에서 구별할 수 없다.
+        // (버블 본문과 달리 이 버튼은 가려질 내용이 없어서 aria-label 이 안전하다)
+        copyBtn.setAttribute("aria-label",
+          "복사: " + m.text.replace(/\s+/g, " ").trim().slice(0, 30));
+        copyBtn.addEventListener("click", (e) => { e.stopPropagation(); copyText(m.text); });
+
+        bubble.append(numEl, contentEl, timeEl, copyBtn);
+      }
+
+      return { el: bubble, editing: false, textEl, moreBtn, numEl, upBtn, downBtn };
+    }
+
     function applyClamp(targets) {
       targets.forEach(({ id, textEl, moreBtn }) => {
         if (!textEl.isConnected) return;
         const isExpanded = expanded.has(id);
-        // 넘침 여부는 항상 '접힌 상태'에서 재본다
         if (isExpanded) textEl.classList.add("clamped");
         const overflows = textEl.scrollHeight > textEl.clientHeight + 1;
         if (!overflows) {
@@ -1374,28 +2310,172 @@
         if (isExpanded) {
           textEl.classList.remove("clamped");
           moreBtn.textContent = "접기";
+          moreBtn.setAttribute("aria-expanded", "true");
         } else {
           moreBtn.textContent = "자세히";
+          moreBtn.setAttribute("aria-expanded", "false");
         }
       });
     }
 
-    // ---- Live sync ----
-    if (configured) {
-      onValue(messagesRef, (snap) => {
-        const val = snap.val() || {};
-        messages = Object.entries(val).map(([id, v]) => ({
-          id,
-          text: v.text || "",
-          createdAt: v.createdAt || 0,
-          hidden: !!v.hidden,
-          order: (v.order !== undefined && v.order !== null) ? v.order : (v.createdAt || 0),
-          updatedAt: (v.updatedAt !== undefined && v.updatedAt !== null) ? v.updatedAt : (v.createdAt || 0),
-          categoryId: v.categoryId || ""
-        }));
+    /* ============================== 실시간 동기화 =========================== */
+
+    // messages(공개) + drafts(강의자만) 두 경로를 하나의 목록으로 합친다.
+    function normalize(id, v, hidden, seg) {
+      return {
+        id,
+        seg,                       // 읽어 온 경로. 쓰기는 반드시 이 값을 따른다.
+        text: v.text || "",
+        createdAt: v.createdAt || 0,
+        hidden,
+        code: !!v.code,
+        order: (v.order !== undefined && v.order !== null) ? v.order : (v.createdAt || 0),
+        updatedAt: (v.updatedAt !== undefined && v.updatedAt !== null) ? v.updatedAt : (v.createdAt || 0),
+        categoryId: v.categoryId || ""
+      };
+    }
+    // 한 틱 안에 들어온 여러 구독 갱신을 한 번의 그리기로 합친다.
+    // 첫 로딩 때 네 구독이 각각 render()를 부르던 것도 함께 정리된다.
+    let renderScheduled = false;
+    // 첫 그리기는 messages·categories·state 세 스냅샷이 모두 도착한 뒤에 한다.
+    // state 가 늦게 오면 필터가 걸리기 전 목록이 한 번 스쳐 지나가기 때문이다.
+    const firstSnap = { messages: false, categories: false, state: false };
+    let firstPaintDone = false;
+    function ready() {
+      if (!online) return true;   // 스냅샷이 올 리 없다 — 빈 상태라도 그려야 한다
+      return firstPaintDone ||
+        (firstSnap.messages && firstSnap.categories && firstSnap.state);
+    }
+    function scheduleRender() {
+      if (renderScheduled) return;
+      renderScheduled = true;
+      setTimeout(() => {
+        renderScheduled = false;
+        if (!ready()) return;
+        firstPaintDone = true;
         render();
+      }, 0);
+    }
+
+    function rebuildMessages() {
+      const out = [];
+      // drafts 를 먼저 넣는다. 아래 중복 제거가 '먼저 것'을 남기므로,
+      // 이동 도중 두 경로에 동시에 잡히는 순간에는 숨김 쪽이 이긴다.
+      // 어긋나더라도 '아직 숨겨져 있다' 쪽으로 어긋나야 안전하다.
+      Object.entries(draftMessages).forEach(([id, v]) => out.push(normalize(id, v, true, "drafts")));
+      Object.entries(liveMessages).forEach(([id, v]) => {
+        // hidden 플래그는 경로와 상관없이 항상 존중한다.
+        // 인증을 켜기 전에 숨겨 둔 글은 messages/ 에 hidden:true 로 남아 있는데,
+        // '경로가 곧 공개 여부'라고 보면 AUTH.enabled 를 켜는 순간 그게 전부 노출된다.
+        // migrateHidden()이 drafts 로 옮길 때까지는 최소한 화면에서라도 가린다.
+        out.push(normalize(id, v, !!v.hidden, "messages"));
       });
-      onValue(categoriesRef, (snap) => {
+      // 중복 제거 + 본문이 빈 레코드 제외.
+      // 빈 레코드는 그릴 내용도 없는데, 규칙이 text length > 0 을 요구하므로
+      // 목록에 남겨 두면 '모두 보이기' 같은 일괄 쓰기가 통째로 거부된다.
+      const seenIds = new Set();
+      messages = out.filter(m => {
+        if (seenIds.has(m.id) || !m.text) return false;
+        seenIds.add(m.id);
+        return true;
+      });
+      if (mode === "teacher") renderHideNote();
+      scheduleRender();
+    }
+
+    // 인증을 켠 뒤 처음 소유자로 로그인했을 때 한 번.
+    // messages/ 에 hidden:true 로 남아 있는 옛 글을 drafts/ 로 옮긴다.
+    // 이걸 안 하면 '숨김'이 여전히 화면 필터일 뿐이라 개발자도구로 읽힌다.
+    let migrated = false;
+    async function migrateHidden() {
+      // messages 스냅샷을 받기 전에는 판단하지 않는다.
+      // 인증이 먼저 풀리면 liveMessages 가 비어 있어 '옮길 게 없다'고 잘못 단정하고,
+      // 그 뒤 도착하는 숨긴 글은 영영 옮겨지지 않는다.
+      // setupPending 중에는 누가 소유자인지 모른다 — 그때는 옮기지 않는다.
+      if (!AUTH.enabled || migrated || !isOwner() || setupPending() || !firstSnap.messages) return;
+      const stale = legacyHidden();
+      if (!stale.length) { migrated = true; return; }
+      migrated = true;
+      const updates = {};
+      stale.forEach(([id, v]) => {
+        updates[`messages/${id}`] = null;
+        updates[`drafts/${id}`] = {
+          text: v.text, createdAt: v.createdAt || 0,
+          updatedAt: v.updatedAt || v.createdAt || 0,
+          order: (v.order !== undefined && v.order !== null) ? v.order : (v.createdAt || 0),
+          code: !!v.code, categoryId: v.categoryId || "", hidden: true
+        };
+      });
+      if (await write(fb.update(baseRef, updates), "숨긴 글 이전")) {
+        showToast("숨긴 글을 안전한 곳으로 옮겼습니다", `${stale.length}개 · 이제 수강생에게 전송되지 않습니다`);
+      } else {
+        migrated = false;   // 실패했으면 다음 기회에 다시 시도한다
+      }
+    }
+
+    // loud=true 인 구독은 권한 오류도 알린다.
+    // 수강생이 drafts 를 못 읽는 건 정상이지만, 강의자가 못 읽는 건 설정이 덜 된 것이다.
+    // 조용히 넘기면 '숨긴 글이 없음'과 '읽을 권한이 없음'이 똑같아 보인다.
+    function onDbError(what, loud) {
+      return (err) => {
+        const code = (err && err.code) || "";
+        if (/permission/i.test(code)) {
+          if (!loud) return;
+          showToast(`${what}을(를) 읽을 권한이 없습니다`,
+            "DB 규칙의 OWNER_UID 가 로그인한 계정의 uid 와 같은지 확인하세요.", true);
+          return;
+        }
+        showToast(`${what}을(를) 불러오지 못했습니다`, failReason(err), true);
+      };
+    }
+
+    let unsubDrafts = null;
+    function wireDrafts() {
+      // drafts는 강의자만 읽을 수 있다. 로그인 상태가 바뀌면 구독을 새로 건다.
+      if (unsubDrafts) { unsubDrafts(); unsubDrafts = null; }
+      // setupPending 중에는 규칙이 어차피 거부한다 — 구독하지 않는다.
+      // (구독하면 로그인한 수강생에게 "권한이 없습니다" 안내가 뜬다)
+      if (!AUTH.enabled || !isOwner() || setupPending()) {
+        draftMessages = {};
+        rebuildMessages();
+        return;
+      }
+      unsubDrafts = fb.onValue(draftsRef, (snap) => {
+        draftMessages = snap.val() || {};
+        rebuildMessages();
+      }, (err) => {
+        // onValue 는 오류가 나면 구독을 스스로 끊는다 — 죽은 해제 함수를 들고 있지 않는다.
+        unsubDrafts = null;
+        draftMessages = {};
+        rebuildMessages();
+        onDbError("숨긴 글", true)(err);
+      });
+    }
+
+    if (online) {
+      fb.onValue(fb.ref(db, ".info/serverTimeOffset"), (snap) => {
+        serverSkew = Number(snap.val()) || 0;
+      });
+      // .info/connected 는 소켓이 붙기 전 false 로 한 번 울린다.
+      // 그대로 반영하면 접속할 때마다 '연결 끊김'이 깜빡인다 — 잠깐 기다렸다 알린다.
+      let connTimer = null;
+      fb.onValue(fb.ref(db, ".info/connected"), (snap) => {
+        clearTimeout(connTimer);
+        if (snap.val() === false) {
+          connTimer = setTimeout(() => connWarnEl.classList.add("is-on"), 4000);
+        } else {
+          connWarnEl.classList.remove("is-on");
+        }
+      });
+
+      fb.onValue(messagesRef, (snap) => {
+        firstSnap.messages = true;
+        liveMessages = snap.val() || {};
+        rebuildMessages();
+        migrateHidden();
+      }, (err) => { firstSnap.messages = true; scheduleRender(); onDbError("글 목록")(err); });
+
+      fb.onValue(categoriesRef, (snap) => {
         const val = snap.val() || {};
         categories = Object.entries(val).map(([id, v]) => ({
           id,
@@ -1403,28 +2483,57 @@
           createdAt: v.createdAt || 0,
           order: (v.order !== undefined && v.order !== null) ? v.order : (v.createdAt || 0)
         }));
+        firstSnap.categories = true;
+        categoriesKey = JSON.stringify(sortCategories(categories).map(c => [c.id, c.name]));
         if (mode === "teacher") syncComposerCategory();
         renderClassBar();
-        render();
-      });
-      onValue(stateRef, (snap) => {
+        scheduleRender();
+      }, (err) => { firstSnap.categories = true; scheduleRender(); onDbError("수업 목록")(err); });
+
+      fb.onValue(stateRef, (snap) => {
         const v = snap.val() || {};
+        firstSnap.state = true;
         activeCategory = v.activeCategory || "";
         if (mode === "teacher") syncComposerCategory();
         renderClassBar();
-        render();
-      });
-      onValue(profileRef, (snap) => {
+        scheduleRender();
+      }, (err) => { firstSnap.state = true; scheduleRender(); onDbError("수업 선택")(err); });
+
+      fb.onValue(profileRef, (snap) => {
         const v = snap.val() || {};
         profile = { name: v.name || "", affiliation: v.affiliation || "", contact: v.contact || "" };
         renderProfile();
         if (mode === "teacher") fillProfileInputs();
-      });
+      }, onDbError("프로필"));
+
+      if (AUTH.enabled && auth) {
+        authMod.onAuthStateChanged(auth, (user) => {
+          currentUser = user;
+          // 소유자가 아니면 강의자 화면을 유지할 이유가 없다.
+          if (mode === "teacher" && !canTeach()) mode = "student";
+          if (pendingTeacher && user) {
+            pendingTeacher = false;
+            if (canTeach()) { mode = "teacher"; location.hash = "teacher"; }
+            else notify("이 계정에는 강의자 권한이 없습니다.");
+          }
+          wireDrafts();
+          renderAuthArea();
+          applyMode();
+          migrateHidden();
+        });
+      }
     }
 
-    // ---- Init: honor #teacher (still requires password) ----
+    // 세 스냅샷 중 하나가 유난히 늦어도 화면이 영영 비어 있으면 안 된다.
+    if (online) setTimeout(() => { if (!firstPaintDone) { firstPaintDone = true; render(); } }, 3000);
+
+    // ---- Init: #teacher 는 여전히 인증을 거친다 ----
     if (location.hash.replace("#", "") === "teacher") {
-      enterTeacher();
+      // 인증 방식에서는 여기서 로그인을 부르지 않는다. 아직 onAuthStateChanged가
+      // 한 번도 안 울려 currentUser가 null이라, 이미 로그인한 사람도 팝업을 보게 된다.
+      // 깃발만 세우고 승격은 onAuthStateChanged에 맡긴다.
+      if (AUTH.enabled) pendingTeacher = true;
+      else enterTeacher();
     }
     applyMode();
   </script>

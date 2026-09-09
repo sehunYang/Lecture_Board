@@ -1,0 +1,58 @@
+{
+  "//": [
+    "1단계(임시) 규칙 — 아직 Authentication을 켜지 않은 상태에서 쓰는 최소 방어선.",
+    "누구나 쓸 수 있는 것은 그대로지만, 글 길이와 필드 모양을 강제해서",
+    "'대용량 블롭 1회 쓰기로 무료 티어 소진 + 보드 마비' 시나리오를 막는다.",
+    "숨김 글은 여전히 수강생에게 전송된다 — 그 문제는 2단계(database.rules.json)에서만 닫힌다.",
+    "적용: Firebase 콘솔 → Realtime Database → 규칙 탭에 붙여넣고 게시."
+  ],
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$room": {
+        "messages": {
+          ".read": true,
+          ".write": true,
+          "$msg": {
+            ".validate": "newData.hasChildren(['text', 'createdAt'])",
+            "text":       { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 4000" },
+            "createdAt":  { ".validate": "newData.isNumber()" },
+            "updatedAt":  { ".validate": "newData.isNumber()" },
+            "order":      { ".validate": "newData.isNumber()" },
+            "hidden":     { ".validate": "newData.isBoolean()" },
+            "code":       { ".validate": "newData.isBoolean()" },
+            "categoryId": { ".validate": "newData.isString() && newData.val().length <= 64" },
+            "$other":     { ".validate": false }
+          }
+        },
+        "categories": {
+          ".read": true,
+          ".write": true,
+          "$cat": {
+            ".validate": "newData.hasChildren(['name'])",
+            "name":      { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60" },
+            "createdAt": { ".validate": "newData.isNumber()" },
+            "order":     { ".validate": "newData.isNumber()" },
+            "$other":    { ".validate": false }
+          }
+        },
+        "state": {
+          ".read": true,
+          ".write": true,
+          "activeCategory": { ".validate": "newData.isString() && newData.val().length <= 64" },
+          "$other":         { ".validate": false }
+        },
+        "profile": {
+          ".read": true,
+          ".write": true,
+          "name":        { ".validate": "newData.isString() && newData.val().length <= 80" },
+          "affiliation": { ".validate": "newData.isString() && newData.val().length <= 120" },
+          "contact":     { ".validate": "newData.isString() && newData.val().length <= 600" },
+          "$other":      { ".validate": false }
+        },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}
