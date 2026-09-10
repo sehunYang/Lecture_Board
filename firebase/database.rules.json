@@ -1,15 +1,16 @@
+// 2단계(권장) 규칙 — Authentication을 켠 뒤 쓰는 최종 규칙.
+// 강의자 uid 는 이미 채워져 있다 — 그대로 콘솔 규칙 탭에 붙여넣어 게시하면 된다.
+//   1) Firebase 콘솔 → Authentication → Sign-in method → Google 사용 설정
+//   2) index.html 의 AUTH.enabled 를 true 로 바꾸고 배포
+//   3) 강의 보드에서 'Google로 로그인' → 화면에 뜨는 uid 를 복사
+//   4) 그 값을 index.html 의 AUTH.ownerUid 와 아래 규칙의 uid 6곳에 넣기
+//
+// 핵심: messages 는 누구나 읽지만 강의자만 쓴다. drafts(숨긴 글)는 강의자만 읽고 쓴다.
+// → 아직 공개하지 않은 글은 수강생 브라우저로 아예 전송되지 않는다.
+//
+// 주석은 반드시 이 '//' 줄 주석 형태여야 한다. 최상위에 "//" 키를 두면
+// 콘솔이 "Line 2: Expected 'rules' property." 로 게시를 거부한다.
 {
-  "//": [
-    "2단계(권장) 규칙 — Authentication을 켠 뒤 쓰는 최종 규칙.",
-    "강의자 uid 는 이미 채워져 있다 — 그대로 콘솔 규칙 탭에 붙여넣어 게시하면 된다.",
-    "  1) Firebase 콘솔 → Authentication → Sign-in method → Google 사용 설정",
-    "  2) index.html 의 AUTH.enabled 를 true 로 바꾸고 배포",
-    "  3) 강의 보드에서 'Google로 로그인' → 화면에 뜨는 uid 를 복사",
-    "  4) 그 값을 index.html 의 AUTH.ownerUid 와 아래 규칙의 uid 6곳에 넣기",
-    "",
-    "핵심: messages 는 누구나 읽지만 강의자만 쓴다. drafts(숨긴 글)는 강의자만 읽고 쓴다.",
-    "→ 아직 공개하지 않은 글은 수강생 브라우저로 아예 전송되지 않는다."
-  ],
   "rules": {
     ".read": false,
     ".write": false,
