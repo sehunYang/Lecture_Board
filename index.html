@@ -948,7 +948,7 @@
 
     // ====== 강의자 인증 ======
     //
-    // 두 가지 방식을 지원합니다. 지금은 1번이 켜져 있습니다.
+    // 두 가지 방식을 지원합니다. 지금은 2번(Google 로그인)이 켜져 있습니다.
     //
     // 1) 비밀번호 (AUTH.enabled = false) — 지금까지의 방식.
     //    브라우저 안에서만 검사하므로 개발자도구로 우회할 수 있고,
@@ -960,7 +960,7 @@
     //    drafts 경로에 보관합니다. 즉 아직 공개하지 않은 글은 수강생에게
     //    아예 전송되지 않습니다. 설정 방법은 README의 "강의자 인증" 절 참고.
     const AUTH = {
-      enabled: false,   // ← Firebase Authentication 설정을 마치면 true
+      enabled: true,    // ← Firebase Authentication 설정 완료
       ownerUid: ""      // ← 로그인 후 화면에 표시되는 uid를 붙여넣기
     };
 
