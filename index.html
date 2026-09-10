@@ -2524,9 +2524,16 @@
     }
 
     let unsubDrafts = null;
-    function wireDrafts() {
+    // 쓰기와 같은 틈이 읽기에도 있다. onAuthStateChanged 가 울린 직후에는
+    // 데이터베이스 소켓에 토큰이 아직 반영되지 않아 drafts 구독이 거부된다.
+    // 그걸 설정 오류로 단정하면 아무 문제 없는 강의자에게 접속할 때마다
+    // "OWNER_UID 를 확인하세요"가 뜬다 — 맞는 설정을 의심하게 만드는 알림이다.
+    let draftsRetry = 0;
+
+    function wireDrafts(isRetry) {
       // drafts는 강의자만 읽을 수 있다. 로그인 상태가 바뀌면 구독을 새로 건다.
       if (unsubDrafts) { unsubDrafts(); unsubDrafts = null; }
+      if (!isRetry) draftsRetry = 0;
       // setupPending 중에는 규칙이 어차피 거부한다 — 구독하지 않는다.
       // (구독하면 로그인한 수강생에게 "권한이 없습니다" 안내가 뜬다)
       if (!AUTH.enabled || !isOwner() || setupPending()) {
@@ -2535,6 +2542,7 @@
         return;
       }
       unsubDrafts = fb.onValue(draftsRef, (snap) => {
+        draftsRetry = 0;
         draftMessages = snap.val() || {};
         rebuildMessages();
       }, (err) => {
@@ -2542,6 +2550,15 @@
         unsubDrafts = null;
         draftMessages = {};
         rebuildMessages();
+        // 권한 오류는 몇 번 다시 붙어 본 뒤에야 진짜라고 본다. 그래도 안 되면
+        // 그때는 정말 설정이 어긋난 것이므로 원래대로 알린다.
+        if (/permission/i.test((err && err.code) || "") && draftsRetry < 3) {
+          draftsRetry++;
+          setTimeout(() => {
+            if (AUTH.enabled && isOwner() && !setupPending()) wireDrafts(true);
+          }, 400 * draftsRetry);
+          return;
+        }
         onDbError("숨긴 글", true)(err);
       });
     }
