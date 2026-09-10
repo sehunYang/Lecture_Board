@@ -2420,11 +2420,21 @@
       const failed = [];
       try {
         for (const [id, v] of stale) {
+          // 타입을 규칙이 요구하는 모양으로 맞춰 넣는다. 옛 글은 이 규칙보다 먼저
+          // 만들어졌으므로 createdAt 이 문자열이거나 categoryId 가 숫자인 레코드가
+          // 있을 수 있고, 그대로 보내면 isNumber()/isString() 검증에 걸려
+          // permission_denied 로만 돌아온다 — 어느 필드인지는 알려주지 않는다.
+          // 숫자로 읽히지 않는 값은 0 으로 두되, 그 사실을 아래에서 이유에 적는다.
+          const num = (x, fallback) => Number.isFinite(Number(x)) ? Number(x) : fallback;
+          const created = num(v.createdAt, 0);
           const rec = {
-            text: v.text, createdAt: v.createdAt || 0,
-            updatedAt: v.updatedAt || v.createdAt || 0,
-            order: (v.order !== undefined && v.order !== null) ? v.order : (v.createdAt || 0),
-            code: !!v.code, categoryId: v.categoryId || "", hidden: true
+            text: String(v.text),
+            createdAt: created,
+            updatedAt: num(v.updatedAt, created),
+            order: num(v.order, created),
+            code: !!v.code,
+            categoryId: String(v.categoryId == null ? "" : v.categoryId),
+            hidden: true
           };
           // 규칙이 4000자 초과 본문을 거부한다. 이 상한은 나중에 생겼으므로
           // 그 전에 올린 글은 더 길 수 있다. 미리 걸러서 이유를 정확히 말한다 —
@@ -2442,7 +2452,12 @@
           try {
             await fb.set(fb.ref(db, `${DRAFTS_PATH}/${id}`), rec);
           } catch (err) {
-            const why = `drafts 쓰기 거부 — ${failReason(err)}`;
+            // 타입을 맞췄는데도 거부됐다면 남은 후보는 길이다. 규칙의 4000이
+            // 문자 수가 아니라 UTF-8 바이트라면 한글 글은 1333자쯤부터 걸린다.
+            // 둘 다 적어 두면 다음 사람이 재현 없이 판별할 수 있다.
+            const bytes = new TextEncoder().encode(rec.text).length;
+            const why = `drafts 쓰기 거부 · ${rec.text.length}자 / ${bytes}바이트 · ` +
+              `categoryId ${rec.categoryId.length}자 — ${failReason(err)}`;
             unmovable.set(id, why);
             failed.push([v.text, why]);
             continue;
