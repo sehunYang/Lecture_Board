@@ -1,11 +1,11 @@
 {
   "//": [
     "2단계(권장) 규칙 — Authentication을 켠 뒤 쓰는 최종 규칙.",
-    "OWNER_UID 를 강의자 계정의 uid로 바꿔 넣어야 동작한다.",
+    "강의자 uid 는 이미 채워져 있다 — 그대로 콘솔 규칙 탭에 붙여넣어 게시하면 된다.",
     "  1) Firebase 콘솔 → Authentication → Sign-in method → Google 사용 설정",
     "  2) index.html 의 AUTH.enabled 를 true 로 바꾸고 배포",
     "  3) 강의 보드에서 'Google로 로그인' → 화면에 뜨는 uid 를 복사",
-    "  4) 그 값을 index.html 의 AUTH.ownerUid 와 아래 OWNER_UID 두 군데에 넣기",
+    "  4) 그 값을 index.html 의 AUTH.ownerUid 와 아래 규칙의 uid 6곳에 넣기",
     "",
     "핵심: messages 는 누구나 읽지만 강의자만 쓴다. drafts(숨긴 글)는 강의자만 읽고 쓴다.",
     "→ 아직 공개하지 않은 글은 수강생 브라우저로 아예 전송되지 않는다."
@@ -17,7 +17,7 @@
       "$room": {
         "messages": {
           ".read": true,
-          ".write": "auth != null && auth.uid === 'OWNER_UID'",
+          ".write": "auth != null && auth.uid === 'D9HZuvbO8ZcvvY7t8vHVqhp2Rp62'",
           "$msg": {
             ".validate": "newData.hasChildren(['text', 'createdAt'])",
             "text":       { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 4000" },
@@ -32,8 +32,8 @@
         },
 
         "drafts": {
-          ".read":  "auth != null && auth.uid === 'OWNER_UID'",
-          ".write": "auth != null && auth.uid === 'OWNER_UID'",
+          ".read":  "auth != null && auth.uid === 'D9HZuvbO8ZcvvY7t8vHVqhp2Rp62'",
+          ".write": "auth != null && auth.uid === 'D9HZuvbO8ZcvvY7t8vHVqhp2Rp62'",
           "$msg": {
             ".validate": "newData.hasChildren(['text', 'createdAt'])",
             "text":       { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 4000" },
@@ -49,7 +49,7 @@
 
         "categories": {
           ".read": true,
-          ".write": "auth != null && auth.uid === 'OWNER_UID'",
+          ".write": "auth != null && auth.uid === 'D9HZuvbO8ZcvvY7t8vHVqhp2Rp62'",
           "$cat": {
             ".validate": "newData.hasChildren(['name'])",
             "name":      { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60" },
@@ -60,13 +60,13 @@
         },
         "state": {
           ".read": true,
-          ".write": "auth != null && auth.uid === 'OWNER_UID'",
+          ".write": "auth != null && auth.uid === 'D9HZuvbO8ZcvvY7t8vHVqhp2Rp62'",
           "activeCategory": { ".validate": "newData.isString() && newData.val().length <= 64" },
           "$other":         { ".validate": false }
         },
         "profile": {
           ".read": true,
-          ".write": "auth != null && auth.uid === 'OWNER_UID'",
+          ".write": "auth != null && auth.uid === 'D9HZuvbO8ZcvvY7t8vHVqhp2Rp62'",
           "name":        { ".validate": "newData.isString() && newData.val().length <= 80" },
           "affiliation": { ".validate": "newData.isString() && newData.val().length <= 120" },
           "contact":     { ".validate": "newData.isString() && newData.val().length <= 600" },

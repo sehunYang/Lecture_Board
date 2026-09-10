@@ -85,7 +85,7 @@ Realtime Database → **규칙** 탭에 붙여넣고 **게시**하세요.
 4. 배포된 보드에서 **강의자 모드 → Google로 로그인**
 5. 화면에 뜨는 **uid**를 복사해서 두 군데에 넣습니다
    - `index.html` 의 `AUTH.ownerUid`
-   - `firebase/database.rules.json` 안의 `OWNER_UID` (두 곳)
+   - `firebase/database.rules.json` 안의 `OWNER_UID` (6곳 — 편집기에서 일괄 치환하세요)
 6. 바뀐 규칙을 콘솔 **규칙** 탭에 붙여넣고 게시, `index.html` 배포
 
 이렇게 하면 `비밀번호_변경.html` 과 `TEACHER_AUTH` 는 더 이상 쓰이지 않습니다.
