@@ -744,8 +744,8 @@
     }
     .profile-footer .pf-copy { margin-top: 6px; font-size: 0.72rem; opacity: 0.9; }
 
-    /* 강의자 비밀번호 다이얼로그 */
-    .pw-dialog {
+    /* 모달 다이얼로그 — 확인·입력 공용 */
+    .modal-dialog {
       border: 1px solid var(--line);
       border-radius: 18px;
       background: var(--surface);
@@ -754,28 +754,8 @@
       min-width: min(21rem, calc(100vw - 2.5rem));
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
     }
-    .pw-dialog::backdrop { background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(3px); }
-    .pw-title { font-size: 1.15rem; font-weight: 800; margin: 0 0 1rem; }
-    .pw-label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
-    .pw-input {
-      width: 100%;
-      font-family: inherit;
-      font-size: 1.3rem;
-      letter-spacing: 0.25em;
-      padding: 0.6rem 0.8rem;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: var(--surface);
-      color: var(--text);
-    }
-    .pw-error {
-      min-height: 1.3rem;
-      margin: 0.45rem 0 0;
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: var(--danger);
-    }
-    .pw-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.6rem; }
+    .modal-dialog::backdrop { background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(3px); }
+    .modal-title { font-size: 1.15rem; font-weight: 800; margin: 0 0 1rem; }
 
     /* Toast 내부 (복사 완료 알림) */
     .toast .toast-msg { display: block; font-size: 0.95rem; }
@@ -899,27 +879,12 @@
     <span id="toastPreview" class="toast-preview" aria-hidden="true"></span>
   </div>
 
-  <!-- 강의자 비밀번호 입력 (화면 공유 중 노출 방지를 위해 type=password 사용) -->
-  <dialog id="pwDialog" class="pw-dialog" aria-labelledby="pwTitle">
-    <form id="pwForm" method="dialog">
-      <h2 id="pwTitle" class="pw-title">강의자 모드</h2>
-      <label class="pw-label" for="pwInput">비밀번호</label>
-      <input id="pwInput" class="pw-input" type="password"
-             autocomplete="current-password" placeholder="비밀번호" />
-      <p id="pwError" class="pw-error" role="alert"></p>
-      <div class="pw-actions">
-        <button type="button" id="pwCancel" class="button">취소</button>
-        <button type="submit" id="pwSubmit" class="btn-primary button">확인</button>
-      </div>
-    </form>
-  </dialog>
-
   <!-- 범용 입력·확인 다이얼로그.
        window.prompt/confirm은 화면 송출 중에 브라우저 크롬 위로 떠서 보드와 따로 놀고,
-       모바일에서는 특히 거슬린다. 비밀번호 다이얼로그와 같은 결로 통일한다. -->
-  <dialog id="askDialog" class="pw-dialog ask-dialog" aria-labelledby="askTitle">
+       모바일에서는 특히 거슬린다. 보드 안에서 뜨는 다이얼로그로 통일한다. -->
+  <dialog id="askDialog" class="modal-dialog ask-dialog" aria-labelledby="askTitle">
     <form id="askForm" method="dialog">
-      <h2 id="askTitle" class="pw-title">확인</h2>
+      <h2 id="askTitle" class="modal-title">확인</h2>
       <p id="askMsg" class="ask-msg"></p>
       <input id="askInput" class="ask-input" type="text" autocomplete="off" />
       <div class="ask-actions">
@@ -948,47 +913,18 @@
 
     // ====== 강의자 인증 ======
     //
-    // 두 가지 방식을 지원합니다. 지금은 2번(Google 로그인)이 켜져 있습니다.
+    // 강의자 인증은 Google 로그인 하나뿐입니다.
+    // DB 규칙이 강의자 uid만 쓰기를 허용하고, 숨긴 글은 강의자만 읽을 수 있는
+    // drafts 경로에 보관합니다. 즉 아직 공개하지 않은 글은 수강생에게
+    // 아예 전송되지 않습니다. 설정 방법은 README의 "강의자 인증" 절 참고.
     //
-    // 1) 비밀번호 (AUTH.enabled = false) — 지금까지의 방식.
-    //    브라우저 안에서만 검사하므로 개발자도구로 우회할 수 있고,
-    //    DB는 여전히 누구나 쓸 수 있습니다. "실수 방지"이지 보안이 아닙니다.
-    //    숨긴 글도 수강생 브라우저로 전송된 뒤 화면에서만 걸러집니다.
-    //
-    // 2) Google 로그인 (AUTH.enabled = true) — 권장.
-    //    DB 규칙이 강의자 uid만 쓰기를 허용하고, 숨긴 글은 강의자만 읽을 수 있는
-    //    drafts 경로에 보관합니다. 즉 아직 공개하지 않은 글은 수강생에게
-    //    아예 전송되지 않습니다. 설정 방법은 README의 "강의자 인증" 절 참고.
+    // 전에는 비밀번호 방식도 함께 지원했습니다. 브라우저 안에서만 검사하므로
+    // 개발자도구로 우회할 수 있었고 DB는 누구나 쓸 수 있었습니다 — "실수 방지"이지
+    // 보안이 아니었습니다. 숨긴 글도 수강생 브라우저로 전송된 뒤 화면에서만
+    // 걸러졌습니다. 두 방식을 함께 두면 약한 쪽이 실제 보호 수준을 정하므로 지웠습니다.
     const AUTH = {
-      enabled: true,    // ← Firebase Authentication 설정 완료
-      ownerUid: "D9HZuvbO8ZcvvY7t8vHVqhp2Rp62"
+      ownerUid: "D9HZuvbO8ZcvvY7t8vHVqhp2Rp62"   // ← 강의자 계정의 uid
     };
-
-    // 비밀번호 방식(1번)에서만 쓰입니다. 평문을 두지 않고 PBKDF2-SHA256 해시만 저장합니다.
-    // 바꾸려면 README의 "비밀번호 변경" 절차를 따르세요.
-    const TEACHER_AUTH = {
-      salt: "b1aaced307c8f58094541122155cbef8",
-      iterations: 310000,
-      hash: "ff761c344ba3dc9886f8cc9db62459dfc6ebddcdca9122ba54050c3db3879555"
-    };
-
-    const hexToBytes = (hex) =>
-      new Uint8Array(hex.match(/../g).map(h => parseInt(h, 16)));
-    const bytesToHex = (buf) =>
-      [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
-
-    async function verifyTeacherPassword(pw) {
-      if (!(window.crypto && crypto.subtle)) return null;   // 판정 불가 (비보안 컨텍스트)
-      const key = await crypto.subtle.importKey(
-        "raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveBits"]
-      );
-      const bits = await crypto.subtle.deriveBits(
-        { name: "PBKDF2", salt: hexToBytes(TEACHER_AUTH.salt),
-          iterations: TEACHER_AUTH.iterations, hash: "SHA-256" },
-        key, 256
-      );
-      return bytesToHex(bits) === TEACHER_AUTH.hash;
-    }
 
     // ====== 방(room) ======
     // ?room=physics2026 으로 보드를 나눌 수 있습니다. 없으면 default.
@@ -1109,7 +1045,7 @@
     const configured = firebaseConfig.apiKey !== "YOUR_API_KEY";
 
     let fb = null;      // firebase-database 모듈
-    let authMod = null; // firebase-auth 모듈 (AUTH.enabled 일 때만)
+    let authMod = null; // firebase-auth 모듈
     let db = null, app = null, auth = null;
     let pendingTeacher = false;   // 로그인 끝나면 강의자 화면으로 갈지
     let messagesRef = null, draftsRef = null, profileRef = null,
@@ -1139,13 +1075,11 @@
         categoriesRef = dbMod.ref(db, CATEGORIES_PATH);
         stateRef = dbMod.ref(db, STATE_PATH);
 
-        if (AUTH.enabled) {
-          authMod = await import(`${SDK}/firebase-auth.js`);
-          auth = authMod.getAuth(app);
-          auth.useDeviceLanguage();
-          // 리디렉션 로그인으로 돌아온 경우 여기서 결과(주로 오류)를 받는다.
-          authMod.getRedirectResult(auth).catch(() => {});
-        }
+        authMod = await import(`${SDK}/firebase-auth.js`);
+        auth = authMod.getAuth(app);
+        auth.useDeviceLanguage();
+        // 리디렉션 로그인으로 돌아온 경우 여기서 결과(주로 오류)를 받는다.
+        authMod.getRedirectResult(auth).catch(() => {});
       } catch (err) {
         // 감시견(6초)을 기다릴 것 없이 지금 바로 알린다.
         showLoadError();
@@ -1174,11 +1108,11 @@
     // ownerUid를 아직 안 채운 '설정 중' 상태.
     // 이때는 로그인한 사람을 강의자로 대접해서 uid를 확인할 수 있게 한다.
     // 실제 쓰기 권한은 DB 규칙이 쥐고 있으므로 이게 구멍이 되지는 않는다.
-    const setupPending = () => AUTH.enabled && !AUTH.ownerUid;
-    const isOwner = () => AUTH.enabled && !!currentUser &&
+    const setupPending = () => !AUTH.ownerUid;
+    const isOwner = () => !!currentUser &&
       (setupPending() || currentUser.uid === AUTH.ownerUid);
     // 이 화면에서 강의자 권한을 쓸 수 있는가
-    const canTeach = () => AUTH.enabled ? isOwner() : true;
+    const canTeach = () => isOwner();
 
     /* ==========================================================================
        코드 표시 모드 — 구문 강조 · indent-rainbow · color highlight
@@ -1313,9 +1247,7 @@
     function failReason(err) {
       const code = (err && (err.code || err.message) || "").toString();
       if (/permission|PERMISSION_DENIED/i.test(code)) {
-        return AUTH.enabled
-          ? "권한이 없습니다. 강의자 계정으로 로그인했는지 확인하세요."
-          : "DB 규칙이 쓰기를 거부했습니다. Firebase 콘솔의 규칙을 확인하세요.";
+        return "권한이 없습니다. 강의자 계정으로 로그인했는지 확인하세요.";
       }
       if (/network|unavailable|disconnect/i.test(code)) return "네트워크를 확인하세요.";
       return "잠시 후 다시 시도해 주세요.";
@@ -1331,7 +1263,8 @@
     /* ================================ 인증 UI =============================== */
 
     // '숨기기'가 실제로 무엇을 하는지 강의자 화면에 적어 둔다.
-    // 비밀번호 방식에서는 숨긴 글도 수강생 브라우저로 전송된 뒤 화면에서만 빠진다.
+    // 지금 숨기는 글은 drafts 로 옮겨져 수강생에게 전송되지 않지만, 비밀번호 시절에
+    // 숨긴 글은 옮겨지기 전까지 여전히 전송된다 — 그 차이를 화면이 말해야 한다.
     // 이 사실을 README에만 적어 두면 아무도 읽지 않는다.
     // 아직 messages/ 에 남아 있는 옛 숨김 글 — 이게 있는 동안은 화면에서만 가려진 상태다.
     // 안내문과 migrateHidden 이 반드시 같은 기준을 보도록 정의를 한 곳에 둔다.
@@ -1352,9 +1285,7 @@
       const el = document.getElementById("hideNote");
       if (!el) return;
       let text, danger = false;
-      if (!AUTH.enabled) {
-        text = "· 숨긴 글도 수강생 기기로 전송됩니다 (화면에서만 가려짐)";
-      } else if (setupPending()) {
+      if (setupPending()) {
         text = "· 설정 미완료: 아래 uid를 index.html과 DB 규칙에 넣으세요";
         danger = true;
       } else if (!firstSnap.messages) {
@@ -1377,7 +1308,7 @@
 
     function renderAuthArea() {
       authAreaEl.textContent = "";
-      if (!AUTH.enabled || !auth) return;
+      if (!auth) return;
 
       if (!currentUser) {
         const b = document.createElement("button");
@@ -1428,60 +1359,13 @@
 
     /* ================================== 모드 =============================== */
 
-    const pwDialogEl = document.getElementById("pwDialog");
-    const pwFormEl = document.getElementById("pwForm");
-    const pwInputEl = document.getElementById("pwInput");
-    const pwErrorEl = document.getElementById("pwError");
-    const pwSubmitEl = document.getElementById("pwSubmit");
-
-    function openPasswordDialog() {
-      pwInputEl.value = "";
-      pwErrorEl.textContent = "";
-      pwSubmitEl.disabled = false;
-      pwDialogEl.showModal();
-      pwInputEl.focus();
-    }
-    document.getElementById("pwCancel").addEventListener("click", () => pwDialogEl.close());
-    pwDialogEl.addEventListener("close", () => { pwInputEl.value = ""; });
-
-    pwFormEl.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const pw = pwInputEl.value;
-      if (!pw) { pwErrorEl.textContent = "비밀번호를 입력하세요."; return; }
-      pwSubmitEl.disabled = true;
-      pwErrorEl.textContent = "확인 중…";
-      const ok = await verifyTeacherPassword(pw);
-      if (ok === null) {
-        pwErrorEl.textContent = "이 환경에서는 확인할 수 없습니다. https 주소로 접속해 주세요.";
-        pwSubmitEl.disabled = false;
-        return;
-      }
-      if (!ok) {
-        pwErrorEl.textContent = "비밀번호가 올바르지 않습니다.";
-        pwInputEl.value = "";
-        pwInputEl.focus();
-        pwSubmitEl.disabled = false;
-        return;
-      }
-      pwInputEl.value = "";
-      pwErrorEl.textContent = "";
-      pwDialogEl.close();
+    function enterTeacher() {
+      // 로그인 여부가 곧 권한이다 — 따로 물을 것이 없다.
+      if (!currentUser) { pendingTeacher = true; signIn(); return; }
+      if (!canTeach()) { notify("이 계정에는 강의자 권한이 없습니다."); return; }
       mode = "teacher";
       location.hash = "teacher";
       applyMode();
-    });
-
-    function enterTeacher() {
-      // Google 로그인 방식이면 비밀번호를 묻지 않는다 — 로그인 여부가 곧 권한이다.
-      if (AUTH.enabled) {
-        if (!currentUser) { pendingTeacher = true; signIn(); return; }
-        if (!canTeach()) { notify("이 계정에는 강의자 권한이 없습니다."); return; }
-        mode = "teacher";
-        location.hash = "teacher";
-        applyMode();
-        return;
-      }
-      openPasswordDialog();
     }
     function exitTeacher() {
       mode = "student";
@@ -1701,15 +1585,10 @@
 
     // 숨기기 = 수강생에게 안 보이게 하기.
     // Google 로그인 방식에서는 글을 drafts로 '옮긴다' — 그래야 수강생 브라우저로
-    // 아예 전송되지 않는다. 비밀번호 방식에서는 예전처럼 hidden 플래그만 세운다
-    // (이 경우 숨긴 글은 여전히 수강생에게 전송되고 화면에서만 걸러진다).
+    // 아예 전송되지 않는다 — 화면에서 거르는 것이 아니라 보내지 않는 것이다.
     function setHidden(id, hidden) {
       const m = byId(id);
       if (!m) return;
-      if (!AUTH.enabled) {
-        write(fb.update(fb.ref(db, `${DB_PATH}/${id}`), { hidden }), hidden ? "숨기기" : "보이기");
-        return;
-      }
       const data = {
         text: m.text, createdAt: m.createdAt, updatedAt: m.updatedAt,
         order: m.order, code: !!m.code, categoryId: m.categoryId || "", hidden: !!hidden
@@ -1731,12 +1610,6 @@
     function setAllHidden(hidden) {
       const targets = messages.filter(matchesActiveCategory).filter(m => !!m.hidden !== !!hidden);
       if (!targets.length) return;
-      if (!AUTH.enabled) {
-        const updates = {};
-        targets.forEach(m => { updates[`${m.id}/hidden`] = hidden; });
-        write(fb.update(messagesRef, updates), hidden ? "모두 숨기기" : "모두 보이기");
-        return;
-      }
       const updates = {};
       const to = hidden ? "drafts" : "messages";
       targets.forEach(m => {
@@ -1859,7 +1732,7 @@
       for (const m of data.messages) {
         if (typeof m.text !== "string" || !m.text.trim()) continue;
         const hidden = !!m.hidden;
-        const seg = (AUTH.enabled && hidden) ? "drafts" : "messages";
+        const seg = hidden ? "drafts" : "messages";
         const key = fb.push(fb.ref(db, `${BASE}/${seg}`)).key;
         updates[`${seg}/${key}`] = {
           text: m.text,
@@ -2378,8 +2251,8 @@
       Object.entries(draftMessages).forEach(([id, v]) => out.push(normalize(id, v, true, "drafts")));
       Object.entries(liveMessages).forEach(([id, v]) => {
         // hidden 플래그는 경로와 상관없이 항상 존중한다.
-        // 인증을 켜기 전에 숨겨 둔 글은 messages/ 에 hidden:true 로 남아 있는데,
-        // '경로가 곧 공개 여부'라고 보면 AUTH.enabled 를 켜는 순간 그게 전부 노출된다.
+        // 비밀번호 시절에 숨겨 둔 글은 messages/ 에 hidden:true 로 남아 있는데,
+        // '경로가 곧 공개 여부'라고만 보면 그런 글이 전부 노출된다.
         // migrateHidden()이 drafts 로 옮길 때까지는 최소한 화면에서라도 가린다.
         out.push(normalize(id, v, !!v.hidden, "messages"));
       });
@@ -2428,7 +2301,7 @@
       // 인증이 먼저 풀리면 liveMessages 가 비어 있어 '옮길 게 없다'고 잘못 단정하고,
       // 그 뒤 도착하는 숨긴 글은 영영 옮겨지지 않는다.
       // setupPending 중에는 누가 소유자인지 모른다 — 그때는 옮기지 않는다.
-      if (!AUTH.enabled || migrating || !isOwner() || setupPending() || !firstSnap.messages) return;
+      if (migrating || !isOwner() || setupPending() || !firstSnap.messages) return;
       // 이미 이유를 알린 글은 다시 시도하지 않는다 — 스냅샷마다 같은 알림이 반복된다.
       const stale = legacyHidden().filter(([id]) => !unmovable.has(id));
       if (!stale.length) return;
@@ -2536,7 +2409,7 @@
       if (!isRetry) draftsRetry = 0;
       // setupPending 중에는 규칙이 어차피 거부한다 — 구독하지 않는다.
       // (구독하면 로그인한 수강생에게 "권한이 없습니다" 안내가 뜬다)
-      if (!AUTH.enabled || !isOwner() || setupPending()) {
+      if (!isOwner() || setupPending()) {
         draftMessages = {};
         rebuildMessages();
         return;
@@ -2555,7 +2428,7 @@
         if (/permission/i.test((err && err.code) || "") && draftsRetry < 3) {
           draftsRetry++;
           setTimeout(() => {
-            if (AUTH.enabled && isOwner() && !setupPending()) wireDrafts(true);
+            if (isOwner() && !setupPending()) wireDrafts(true);
           }, 400 * draftsRetry);
           return;
         }
@@ -2617,7 +2490,7 @@
         if (mode === "teacher") fillProfileInputs();
       }, onDbError("프로필"));
 
-      if (AUTH.enabled && auth) {
+      if (auth) {
         authMod.onAuthStateChanged(auth, (user) => {
           currentUser = user;
           // 소유자가 아니면 강의자 화면을 유지할 이유가 없다.
@@ -2640,11 +2513,10 @@
 
     // ---- Init: #teacher 는 여전히 인증을 거친다 ----
     if (location.hash.replace("#", "") === "teacher") {
-      // 인증 방식에서는 여기서 로그인을 부르지 않는다. 아직 onAuthStateChanged가
-      // 한 번도 안 울려 currentUser가 null이라, 이미 로그인한 사람도 팝업을 보게 된다.
+      // 여기서 로그인을 부르지 않는다. 아직 onAuthStateChanged가 한 번도 안 울려
+      // currentUser가 null이라, 이미 로그인한 사람도 팝업을 보게 된다.
       // 깃발만 세우고 승격은 onAuthStateChanged에 맡긴다.
-      if (AUTH.enabled) pendingTeacher = true;
-      else enterTeacher();
+      pendingTeacher = true;
     }
     applyMode();
   </script>
